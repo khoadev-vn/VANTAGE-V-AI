@@ -1,0 +1,59 @@
+{
+  "metadata": {
+    "benchmark_environment": "Kaggle Cloud Platform",
+    "gpu_devices": [
+      {
+        "device_id": 0,
+        "name": "Tesla T4",
+        "vram_gb": 14.56,
+        "compute_capability": "7.5"
+      },
+      {
+        "device_id": 1,
+        "name": "Tesla T4",
+        "vram_gb": 14.56,
+        "compute_capability": "7.5"
+      }
+    ],
+    "cuda_available": true,
+    "model_id": "Qwen/Qwen2.5-3B-Instruct",
+    "prompt_tokens": 1024,
+    "generated_tokens": 64,
+    "precision": "torch.float16",
+    "device_map": "auto"
+  },
+  "results": {
+    "standard_hf": {
+      "label": "Standard Hugging Face DynamicCache (Full Attention)",
+      "throughput_tok_s": 7.46,
+      "peak_vram_allocated_mb": 3761.42,
+      "peak_vram_reserved_mb": 3790.0,
+      "sample_output": "-generation memory architectures to handle long-context reasoning, multi-turn di...",
+      "token_match_ratio": "64/64"
+    },
+    "vantage_sliding_nosink": {
+      "label": "Vantage Sliding Window (No Sinks, W=256)",
+      "throughput_tok_s": 11.89,
+      "peak_vram_allocated_mb": 3755.74,
+      "peak_vram_reserved_mb": 3784.0,
+      "sample_output": "-generation memory architectures to handle long-context reasoning, multi-turn di...",
+      "token_match_ratio": "20/64"
+    },
+    "vantage_sota_sink4": {
+      "label": "Vantage Bounded Streaming (Sink=4, W=256, Lossless)",
+      "throughput_tok_s": 11.93,
+      "peak_vram_allocated_mb": 3755.74,
+      "peak_vram_reserved_mb": 3780.0,
+      "sample_output": "-generation memory architectures to handle long context reasoning, multi-turn di...",
+      "token_match_ratio": "17/64"
+    },
+    "vantage_sota_sink4_fp8": {
+      "label": "Vantage Bounded Streaming (Sink=4, W=256, FP8)",
+      "throughput_tok_s": 10.76,
+      "peak_vram_allocated_mb": 3755.74,
+      "peak_vram_reserved_mb": 3780.0,
+      "sample_output": "-generation memory architectures to handle long context reasoning, multi-turn di...",
+      "token_match_ratio": "17/64"
+    }
+  }
+}

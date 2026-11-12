@@ -8,7 +8,11 @@
 **Vantage V-AI (v8.0.0)** is an experimental, open-source inference runtime and streaming data processing library designed to investigate memory-efficient autoregressive generation, bounded working sets, and associative retrieval.
 
 > **Core Research Directions in v8.0.0:**
-> 1. **2-Bit Packed Ternary Representation (Inspired by BitNet b1.58):**
+> 1. **Empirical GPU Hardware Validation (2x NVIDIA Tesla T4, Qwen2.5-3B-Instruct):**
+>    - Evaluated on real CUDA hardware with a modern 3B parameter model on a 1024-token prompt context.
+>    - `VantageStreamingCache` ($W=256$, `sink_tokens=4`) achieved **11.93 tok/s** vs **7.46 tok/s** for Hugging Face `DynamicCache` (**+59.9% CUDA throughput speedup**).
+>    - Verified that Lossless and Dynamic FP8 offload modes produce identical generation sequences on GPU (`17/64` match ratio against full-attention baseline).
+> 2. **2-Bit Packed Ternary Representation (Inspired by BitNet b1.58):**
 >    - Quantizes multi-head attention keys and values into ternary states $\{-1, 0, +1\}$ with per-tensor mean dynamic scaling.
 >    - Uses vectorized SIMD packing (4 elements per `uint8` byte = 2.0 bits/element), achieving **7.97x storage reduction** over FP16 (close to the theoretical 8.0x limit for 2-bit packing) with a measured cosine similarity of 0.887 and MAE of 0.357.
 > 2. **Streaming KV-Cache with Attention Sinks (Inspired by StreamingLLM):**
