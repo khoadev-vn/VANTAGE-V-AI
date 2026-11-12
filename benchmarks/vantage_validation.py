@@ -1,16 +1,12 @@
 """
-Vantage V-AI Scientific Validation & Benchmark Suite (v5.0)
+Vantage V-AI Scientific Validation & Benchmark Suite (v5.1)
 
-Reproducible experimental protocol:
-- Environment metadata (OS, CPU, physical/logical cores, RAM, Python, packages, git SHA)
-- 4 distinct entropy/structure datasets (repeated, json_records, ai_corpus, random)
-- 5 fair baselines (python_lz4_naive, pyarrow_lz4, vantage_lz4_frame_1t,
-  vantage_lz4_block_1t, vantage_lz4_parallel)
-- Warm-up + 7 independent trials per (dataset, baseline)
-- P50 / P95 / P99 latency, MB/s throughput, compression ratio
-- Python peak heap allocation (tracemalloc) + Process Peak RSS (psutil)
-- Mandatory round-trip decompression + CRC32 correctness verification
-- Separate real BPE tokenization benchmark (tiktoken cl100k_base) on ai_corpus
+Upgrades over v5.0:
+- 30 independent trials per (dataset, baseline) with IQR & StdDev dispersion
+- Strict codec parity: python_lz4_frame_naive vs vantage_lz4_frame_1t, and
+  python_lz4_block_naive vs vantage_lz4_block_raw (no CRC32) & vantage_lz4_block_1t (with CRC32)
+- Isolated subprocess Peak RSS profiling per baseline (full lifecycle)
+- Separate real BPE tokenization baseline (tiktoken cl100k_base, 1 MiB slice)
 """
 
 from __future__ import annotations
@@ -19,7 +15,6 @@ import csv
 import datetime
 import gc
 import json
-import os
 import platform
 import statistics
 import subprocess
@@ -30,6 +25,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Callable, Dict, List, Optional, Tuple
 
+import lz4.block
 import lz4.frame
 import numpy as np
 import psutil
@@ -38,14 +34,9 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from benchmarks.datasets import DatasetSpec, generate_datasets
+from benchmarks.isolated_memory_bench import run_isolated_memory_suite
 from benchmarks.memory_profiler import measure_memory
-from core.engine import (
-    CodecType,
-    CollectingSink,
-    NullSink,
-    ParallelStreamProcessor,
-    StatelessStreamProcessor,
-)
+from core.engine import CodecType, CollectingSink, NullSink, StatelessStreamProcessor
 
 try:
     import pyarrow as pa
@@ -62,8 +53,8 @@ RESULTS_DIR = REPO_ROOT / "benchmarks" / "results"
 LOG_PATH = REPO_ROOT / "benchmarks" / "VANTAGE_VALIDATION.log"
 
 DATASET_BYTES = 8 * 1024 * 1024  # 8 MiB per dataset
-TRIALS = 7
-WARMUP = 1
+TRIALS = 30
+WARMUP = 2
 
 
 @dataclass
@@ -75,10 +66,11 @@ class SummaryRow:
     compression_ratio: float
     throughput_p50_mbs: float
     latency_p50_ms: float
+    latency_iqr_ms: float
+    latency_stddev_ms: float
     latency_p95_ms: float
     latency_p99_ms: float
     py_peak_alloc_mb: float
-    process_peak_rss_mb: float
     verified: bool
 
 
@@ -118,12 +110,23 @@ def _collect_env_info() -> Dict[str, object]:
     }
 
 
-def _run_python_lz4_naive(data: bytes) -> Tuple[int, Callable[[], bool]]:
+def _run_python_lz4_frame_naive(data: bytes) -> Tuple[int, Callable[[], bool]]:
     compressed = lz4.frame.compress(data)
     expected_crc = zlib.crc32(data) & 0xFFFFFFFF
 
     def verify() -> bool:
         restored = lz4.frame.decompress(compressed)
+        return (zlib.crc32(restored) & 0xFFFFFFFF) == expected_crc
+
+    return len(compressed), verify
+
+
+def _run_python_lz4_block_naive(data: bytes) -> Tuple[int, Callable[[], bool]]:
+    compressed = lz4.block.compress(data, store_size=True)
+    expected_crc = zlib.crc32(data) & 0xFFFFFFFF
+
+    def verify() -> bool:
+        restored = lz4.block.decompress(compressed)
         return (zlib.crc32(restored) & 0xFFFFFFFF) == expected_crc
 
     return len(compressed), verify
@@ -153,8 +156,9 @@ def _run_vantage(
     def verify() -> bool:
         csink = CollectingSink()
         cstats = processor.process(data, csink)
-        restored = processor.verify_roundtrip(csink.frames(), expected_crc32=cstats.crc32)
-        return len(restored) == len(data)
+        expected = cstats.crc32 if processor.compute_checksum else None
+        restored = processor.verify_roundtrip(csink.frames(), expected_crc32=expected)
+        return restored == data
 
     return stats.output_bytes, verify
 
@@ -169,13 +173,12 @@ def benchmark_pair(
     runner: Callable[[bytes], Tuple[int, Callable[[], bool]]],
     raw_rows: List[Dict[str, object]],
 ) -> SummaryRow:
-    # Warm-up + correctness check
-    out_bytes, verify_fn = runner(ds.data)
+    for _ in range(WARMUP):
+        out_bytes, verify_fn = runner(ds.data)
     verified = verify_fn()
 
     latencies_ms: List[float] = []
     py_peaks_mb: List[float] = []
-    proc_peaks_mb: List[float] = []
 
     for trial in range(1, TRIALS + 1):
         gc.collect()
@@ -187,7 +190,6 @@ def benchmark_pair(
         lat_ms = elapsed_s * 1000.0
         latencies_ms.append(lat_ms)
         py_peaks_mb.append(mem.python_peak_alloc_mb)
-        proc_peaks_mb.append(mem.peak_rss_mb)
 
         raw_rows.append(
             {
@@ -199,12 +201,13 @@ def benchmark_pair(
                 "latency_ms": round(lat_ms, 4),
                 "throughput_mbs": round((len(ds.data) / (1024 * 1024)) / elapsed_s, 2),
                 "py_peak_alloc_mb": round(mem.python_peak_alloc_mb, 3),
-                "process_peak_rss_mb": round(mem.peak_rss_mb, 2),
                 "verified": verified,
             }
         )
 
     p50_ms = statistics.median(latencies_ms)
+    iqr_ms = _percentile(latencies_ms, 75) - _percentile(latencies_ms, 25)
+    std_ms = statistics.stdev(latencies_ms)
     p95_ms = _percentile(latencies_ms, 95)
     p99_ms = _percentile(latencies_ms, 99)
     input_mb = len(ds.data) / (1024 * 1024)
@@ -220,10 +223,11 @@ def benchmark_pair(
         compression_ratio=round(ratio, 2),
         throughput_p50_mbs=round(throughput_p50, 2),
         latency_p50_ms=round(p50_ms, 3),
+        latency_iqr_ms=round(iqr_ms, 3),
+        latency_stddev_ms=round(std_ms, 3),
         latency_p95_ms=round(p95_ms, 3),
         latency_p99_ms=round(p99_ms, 3),
         py_peak_alloc_mb=round(statistics.median(py_peaks_mb), 3),
-        process_peak_rss_mb=round(max(proc_peaks_mb), 2),
         verified=verified,
     )
 
@@ -234,10 +238,9 @@ def benchmark_real_tokenization(ai_corpus: DatasetSpec) -> Optional[Dict[str, ob
         return None
     enc = tiktoken.get_encoding("cl100k_base")
     text_slice = ai_corpus.data[: 1024 * 1024].decode("utf-8", errors="ignore")
-    # Warm-up
     tokens = enc.encode(text_slice)
     times: List[float] = []
-    for _ in range(5):
+    for _ in range(10):
         t0 = time.perf_counter()
         tokens = enc.encode(text_slice)
         times.append(time.perf_counter() - t0)
@@ -255,12 +258,13 @@ def benchmark_real_tokenization(ai_corpus: DatasetSpec) -> Optional[Dict[str, ob
 def render_log(
     env: Dict[str, object],
     summaries: List[SummaryRow],
+    isolated_mem: List[Dict[str, object]],
     tok_result: Optional[Dict[str, object]],
 ) -> str:
     lines = [
-        "=" * 92,
-        "VANTAGE V-AI v5.0 — SCIENTIFIC VALIDATION & BENCHMARK LOG",
-        "=" * 92,
+        "=" * 104,
+        "VANTAGE V-AI v5.1 — SCIENTIFIC VALIDATION & CODEC-PARITY BENCHMARK LOG",
+        "=" * 104,
         f"Timestamp (UTC): {env['timestamp_utc']}",
         f"Git SHA:         {env['git_sha']}",
         f"OS / Arch:       {env['os']}",
@@ -268,24 +272,37 @@ def render_log(
         f"System RAM:      {env['ram_gb']} GB",
         f"Python:          {env['python_version']}",
         f"Packages:        {env['packages']}",
-        f"Protocol:        {DATASET_BYTES // (1024 * 1024)} MiB/dataset, {WARMUP} warmup, {TRIALS} trials, CRC32 + roundtrip verified",
-        "-" * 92,
-        f"{'Dataset':<13} {'Baseline':<22} {'MB/s(P50)':>10} {'P50(ms)':>9} {'P95(ms)':>9} {'P99(ms)':>9} {'Ratio':>7} {'PyPeak(MB)':>11} {'RSSPeak(MB)':>12} {'OK':>4}",
-        "-" * 92,
+        f"Protocol:        {DATASET_BYTES // (1024 * 1024)} MiB/dataset, {WARMUP} warmups, {TRIALS} trials, CRC32 + roundtrip verified",
+        "-" * 104,
+        f"{'Dataset':<13} {'Baseline':<23} {'MB/s(P50)':>9} {'P50(ms)':>8} {'IQR':>7} {'Std':>7} {'P95(ms)':>8} {'P99(ms)':>8} {'Ratio':>7} {'PyPeak':>7} {'OK':>4}",
+        "-" * 104,
     ]
     for r in summaries:
         lines.append(
-            f"{r.dataset:<13} {r.baseline:<22} {r.throughput_p50_mbs:>10.2f} "
-            f"{r.latency_p50_ms:>9.3f} {r.latency_p95_ms:>9.3f} {r.latency_p99_ms:>9.3f} "
-            f"{r.compression_ratio:>6.2f}x {r.py_peak_alloc_mb:>11.3f} "
-            f"{r.process_peak_rss_mb:>12.2f} {'PASS' if r.verified else 'FAIL':>4}"
+            f"{r.dataset:<13} {r.baseline:<23} {r.throughput_p50_mbs:>9.2f} "
+            f"{r.latency_p50_ms:>8.3f} {r.latency_iqr_ms:>7.3f} {r.latency_stddev_ms:>7.3f} "
+            f"{r.latency_p95_ms:>8.3f} {r.latency_p99_ms:>8.3f} "
+            f"{r.compression_ratio:>6.2f}x {r.py_peak_alloc_mb:>7.3f} {'PASS' if r.verified else 'FAIL':>4}"
+        )
+
+    lines.extend(
+        [
+            "-" * 104,
+            "ISOLATED SUBPROCESS FULL-LIFECYCLE MEMORY (8 MiB random, fresh process per baseline):",
+            f"{'Baseline':<25} {'RSS_Start(MB)':>13} {'RSS_Input(MB)':>13} {'Peak_RSS(MB)':>13} {'Proc_Overhead(MB)':>18}",
+        ]
+    )
+    for m in isolated_mem:
+        lines.append(
+            f"{m['baseline']:<25} {m['rss_start_mb']:>13.2f} {m['rss_after_input_mb']:>13.2f} "
+            f"{m['isolated_peak_rss_mb']:>13.2f} {m['processing_rss_overhead_mb']:>18.2f}"
         )
 
     if tok_result:
         lines.extend(
             [
-                "-" * 92,
-                "SEPARATE REAL TOKENIZATION BASELINE (NOT CONFLATED WITH BYTE COMPRESSION):",
+                "-" * 104,
+                "SEPARATE REAL TOKENIZATION BASELINE (1 MiB ai_corpus slice; NOT LLM inference or Vantage-accelerated):",
                 f"  Tokenizer:     {tok_result['tokenizer']}",
                 f"  Input Slice:   {tok_result['input_bytes']} bytes -> {tok_result['actual_tokens']} actual tokens",
                 f"  Median Time:   {tok_result['median_ms']} ms",
@@ -293,7 +310,7 @@ def render_log(
             ]
         )
 
-    lines.append("=" * 92)
+    lines.append("=" * 104)
     return "\n".join(lines) + "\n"
 
 
@@ -302,12 +319,19 @@ def main() -> None:
     env = _collect_env_info()
     datasets = generate_datasets(DATASET_BYTES)
 
-    vantage_frame_1t = StatelessStreamProcessor(chunk_bytes=256 * 1024, codec=CodecType.LZ4_FRAME)
-    vantage_block_1t = StatelessStreamProcessor(chunk_bytes=256 * 1024, codec=CodecType.LZ4_BLOCK)
-    vantage_parallel = ParallelStreamProcessor(chunk_bytes=512 * 1024, codec=CodecType.LZ4_FRAME)
+    vantage_frame_1t = StatelessStreamProcessor(
+        chunk_bytes=256 * 1024, codec=CodecType.LZ4_FRAME, compute_checksum=True, frame_checksum=True
+    )
+    vantage_block_1t = StatelessStreamProcessor(
+        chunk_bytes=256 * 1024, codec=CodecType.LZ4_BLOCK, compute_checksum=True
+    )
+    vantage_block_raw = StatelessStreamProcessor(
+        chunk_bytes=256 * 1024, codec=CodecType.LZ4_BLOCK, compute_checksum=False
+    )
 
     baselines: List[Tuple[str, Callable[[bytes], Tuple[int, Callable[[], bool]]]]] = [
-        ("python_lz4_naive", _run_python_lz4_naive),
+        ("python_lz4_frame_naive", _run_python_lz4_frame_naive),
+        ("python_lz4_block_naive", _run_python_lz4_block_naive),
     ]
     if pa is not None:
         baselines.append(("pyarrow_lz4", _run_pyarrow_lz4))
@@ -315,7 +339,7 @@ def main() -> None:
         [
             ("vantage_lz4_frame_1t", lambda d: _run_vantage(d, vantage_frame_1t)),
             ("vantage_lz4_block_1t", lambda d: _run_vantage(d, vantage_block_1t)),
-            ("vantage_lz4_parallel", lambda d: _run_vantage(d, vantage_parallel)),
+            ("vantage_lz4_block_raw", lambda d: _run_vantage(d, vantage_block_raw)),
         ]
     )
 
@@ -325,33 +349,31 @@ def main() -> None:
     for ds_name in ("repeated", "json_records", "ai_corpus", "random"):
         ds = datasets[ds_name]
         for b_name, runner in baselines:
-            row = benchmark_pair(ds, b_name, runner, raw_rows)
-            summaries.append(row)
+            summaries.append(benchmark_pair(ds, b_name, runner, raw_rows))
 
+    isolated_mem = run_isolated_memory_suite([b[0] for b in baselines], "random", DATASET_BYTES)
     tok_result = benchmark_real_tokenization(datasets["ai_corpus"])
 
-    # Save raw CSV
     csv_path = RESULTS_DIR / "benchmark_results.csv"
     with csv_path.open("w", newline="", encoding="utf-8") as f:
         writer = csv.DictWriter(f, fieldnames=list(raw_rows[0].keys()))
         writer.writeheader()
         writer.writerows(raw_rows)
 
-    # Save JSON summary
     json_path = RESULTS_DIR / "benchmark_summary.json"
     with json_path.open("w", encoding="utf-8") as f:
         json.dump(
             {
                 "environment": env,
                 "summary": [asdict(s) for s in summaries],
+                "isolated_memory": isolated_mem,
                 "tokenization_baseline": tok_result,
             },
             f,
             indent=2,
         )
 
-    # Render and save validation log
-    log_text = render_log(env, summaries, tok_result)
+    log_text = render_log(env, summaries, isolated_mem, tok_result)
     LOG_PATH.write_text(log_text, encoding="utf-8")
     print(log_text)
 

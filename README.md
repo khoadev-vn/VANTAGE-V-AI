@@ -4,10 +4,10 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-11%20Passing-brightgreen.svg)](tests/test_engine.py)
 
-**Vantage V-AI (v5.0)** is a research prototype for **stateless, bounded-memory streaming data processing and compression** in resource-constrained AI/edge pipelines.
+**Vantage V-AI (v5.1)** is a research prototype for **stateless, bounded-memory streaming data processing and compression** in resource-constrained AI/edge pipelines.
 
-> **Scientific Positioning & Correction Notice (v5.0):**
-> Earlier v4.0 documentation reported `4.3B tokens/s` and `<2MB RAM` using a fixed `20 tokens/record` heuristic on repeated LZ4-compressed bytes and an unbounded `self.vault` list. In v5.0, those claims have been retracted and replaced with a strictly stateless architecture, bounded sinks, CRC32 + round-trip verification, multi-entropy datasets, fair baselines, and separate real BPE tokenization measurements.
+> **Scientific Positioning:**
+> Vantage V-AI is a **data processing and streaming compression layer**, not an LLM inference runtime. Earlier v4.0 claims (`4.3B tokens/s`, `<2MB RAM`) were retracted. Version 5.1 establishes codec-parity baselines, 30-trial statistical dispersion (`IQR`, `StdDev`, `P95`, `P99`), isolated-subprocess `Peak RSS` profiling, mandatory `CRC32` + round-trip verification, and a separate real BPE tokenization baseline.
 
 ---
 
@@ -16,7 +16,7 @@
 ```text
 Input Buffer (bytes / bytearray / memoryview)
    │
-   ▼  memoryview zero-copy slicing (chunk_bytes = 256 KiB)
+   ▼  memoryview zero-copy slicing (chunk_bytes = 256 KiB, L2-cache-local)
 StatelessStreamProcessor  [No retained payload state; optional CRC32]
    │
    ▼  Pluggable Codec (lz4_frame | lz4_block | zstd | none)
@@ -27,52 +27,66 @@ OutputSink
    └── CollectingSink        (round-trip verification & testing)
 ```
 
-Key engineering properties in [`core/engine.py`](core/engine.py):
-- **Strictly Stateless Execution:** [`StatelessStreamProcessor`](core/engine.py) holds configuration only—no `self.vault` accumulation across calls.
-- **Bounded Memory:** [`BoundedMemorySink`](core/engine.py) enforces a hard `max_bytes` ceiling with configurable eviction or `MemoryError` backpressure.
-- **Buffer-Protocol Slicing:** Slices `bytes`, `bytearray`, and `memoryview` inputs without intermediate Python-side input copies.
-- **Verifiable Integrity:** Every run supports `zlib.crc32` checksums and full round-trip decompression via `verify_roundtrip()`.
-
 ---
 
-## Verified Benchmark Results (v5.0)
+## Verified Benchmark Results (v5.1 — 30 Trials, Codec Parity)
 
 Measured on **Windows 11 (AMD64), Intel64 Family 6 Model 165 Stepping 3 (6C / 12T), 15.9 GB RAM, Python 3.12.10** (`lz4 4.4.5`, `pyarrow 25.0.1`, `tiktoken 0.14.0`, `psutil 7.2.0`).  
-Protocol: **8 MiB per dataset**, **1 warm-up + 7 independent trials**, **CRC32 + round-trip verified (`PASS`)**.  
+Protocol: **8 MiB per dataset**, **2 warm-ups + 30 independent trials**, **CRC32 + round-trip verified (`PASS`)**.  
 Raw trial data: [`benchmarks/results/benchmark_results.csv`](benchmarks/results/benchmark_results.csv) · Full log: [`benchmarks/VANTAGE_VALIDATION.log`](benchmarks/VANTAGE_VALIDATION.log).
 
-### 1. Streaming Compression & Memory Footprint (8 MiB Payload)
+### 1. Codec-Parity Streaming Compression (8 MiB Payload, 30 Trials)
 
-| Dataset | Baseline | P50 Throughput (MB/s) | P50 (ms) | P95 (ms) | P99 (ms) | Ratio | Py Heap Peak (MB) | Process Peak RSS (MB) | Verified |
-| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :---: |
-| `repeated` | `python_lz4_naive` | 1380.95 | 5.793 | 6.238 | 6.309 | 242.19x | 8.034 | 94.11 | PASS |
-| `repeated` | `pyarrow_lz4` | 1337.72 | 5.980 | 6.239 | 6.253 | 242.25x | 8.001 | 95.12 | PASS |
-| `repeated` | `vantage_lz4_frame_1t` | 1138.83 | 7.025 | 8.393 | 8.701 | 225.99x | **0.254** | 103.53 | PASS |
-| `repeated` | `vantage_lz4_block_1t` | 1274.00 | 6.279 | 6.988 | 7.067 | 238.75x | **0.254** | 103.53 | PASS |
-| `json_records` | `python_lz4_naive` | 775.83 | 10.312 | 12.742 | 12.801 | 6.95x | 9.153 | 104.80 | PASS |
-| `json_records` | `pyarrow_lz4` | 854.47 | 9.363 | 9.612 | 9.658 | 6.95x | 8.001 | 104.80 | PASS |
-| `json_records` | `vantage_lz4_block_1t` | **867.28** | **9.224** | **9.557** | 9.660 | 6.90x | **0.325** | 105.09 | PASS |
-| `ai_corpus` | `python_lz4_naive` | 1020.19 | 7.842 | 8.012 | 8.036 | 13.24x | 8.605 | 105.55 | PASS |
-| `ai_corpus` | `pyarrow_lz4` | 1077.14 | 7.427 | 7.792 | 7.842 | 13.24x | 8.001 | 105.55 | PASS |
-| `ai_corpus` | `vantage_lz4_block_1t` | 1040.56 | 7.688 | 8.280 | 8.379 | 12.99x | **0.291** | 105.55 | PASS |
-| `random` | `python_lz4_naive` | 598.60 | 13.365 | 16.470 | 17.406 | 1.00x | 16.001 | 119.69 | PASS |
-| `random` | `pyarrow_lz4` | 783.49 | 10.211 | 10.650 | 10.670 | 1.00x | 8.001 | 119.69 | PASS |
-| `random` | `vantage_lz4_block_1t` | **1188.14** | **6.733** | **7.001** | **7.008** | 1.00x | **0.754** | 119.69 | PASS |
+- `vantage_lz4_block_raw` uses `lz4.block.compress(..., store_size=True)` with `256 KiB` `memoryview` slicing and **no** CRC32 (exact codec parity with `python_lz4_block_naive`).
+- `vantage_lz4_block_1t` adds per-chunk `zlib.crc32` integrity verification on top.
 
-### 2. Separate Real BPE Tokenization Baseline (`tiktoken cl100k_base`)
+| Dataset | Baseline | P50 MB/s | P50 (ms) | IQR (ms) | Std (ms) | P95 (ms) | P99 (ms) | Ratio | PyPeak (MB) |
+| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| `repeated` | `python_lz4_frame_naive` | 1289.89 | 6.202 | 0.563 | 1.186 | 8.122 | 10.826 | 242.19x | 8.034 |
+| `repeated` | `python_lz4_block_naive` | 1328.68 | 6.021 | 0.697 | 0.698 | 7.240 | 8.466 | 254.45x | 8.063 |
+| `repeated` | `pyarrow_lz4` | 1343.97 | 5.952 | 0.605 | 0.838 | 6.946 | 9.277 | 242.25x | 8.001 |
+| `repeated` | `vantage_lz4_frame_1t` | 1069.93 | 7.477 | 2.650 | 1.702 | 11.280 | 11.755 | 225.99x | **0.253** |
+| `repeated` | `vantage_lz4_block_1t` | 1238.89 | 6.457 | 1.478 | 2.574 | 12.188 | 16.325 | 238.75x | **0.254** |
+| `repeated` | `vantage_lz4_block_raw` | **6180.45** | **1.294** | 0.517 | 0.777 | 3.487 | 3.761 | 238.75x | **0.254** |
+| `json_records` | `python_lz4_frame_naive` | 725.58 | 11.026 | 3.695 | 3.011 | 17.527 | 20.303 | 6.95x | 9.153 |
+| `json_records` | `python_lz4_block_naive` | 838.95 | 9.536 | 0.344 | 0.268 | 10.096 | 10.383 | 6.95x | 9.183 |
+| `json_records` | `pyarrow_lz4` | 875.91 | 9.134 | 0.231 | 0.837 | 11.583 | 12.093 | 6.95x | 8.001 |
+| `json_records` | `vantage_lz4_frame_1t` | 780.77 | 10.246 | 0.052 | 0.121 | 10.496 | 10.701 | 6.90x | **0.324** |
+| `json_records` | `vantage_lz4_block_1t` | 867.65 | 9.220 | 0.262 | 0.358 | 9.624 | 10.623 | 6.90x | **0.325** |
+| `json_records` | `vantage_lz4_block_raw` | **1761.33** | **4.542** | 0.100 | 0.173 | 4.919 | 5.223 | 6.90x | **0.325** |
+| `ai_corpus` | `python_lz4_frame_naive` | 1088.63 | 7.349 | 0.099 | 0.095 | 7.577 | 7.664 | 13.24x | 8.605 |
+| `ai_corpus` | `python_lz4_block_naive` | 1083.48 | 7.384 | 0.181 | 0.261 | 8.035 | 8.276 | 13.26x | 8.635 |
+| `ai_corpus` | `pyarrow_lz4` | 1087.28 | 7.358 | 0.128 | 0.263 | 8.067 | 8.258 | 13.24x | 8.001 |
+| `ai_corpus` | `vantage_lz4_frame_1t` | 900.65 | 8.883 | 0.888 | 0.961 | 11.629 | 12.051 | 12.97x | **0.290** |
+| `ai_corpus` | `vantage_lz4_block_1t` | 1045.35 | 7.653 | 0.395 | 0.222 | 8.033 | 8.084 | 12.99x | **0.291** |
+| `ai_corpus` | `vantage_lz4_block_raw` | **2777.60** | **2.880** | 0.159 | 0.117 | 3.162 | 3.254 | 12.99x | **0.291** |
+| `random` | `python_lz4_frame_naive` | 683.08 | 11.712 | 1.714 | 3.026 | 18.342 | 23.699 | 1.00x | 16.001 |
+| `random` | `python_lz4_block_naive` | 728.12 | 10.987 | 2.323 | 1.723 | 14.697 | 15.944 | 1.00x | 16.063 |
+| `random` | `pyarrow_lz4` | 842.38 | 9.497 | 1.849 | 2.412 | 14.481 | 18.974 | 1.00x | 8.001 |
+| `random` | `vantage_lz4_frame_1t` | 840.57 | 9.517 | 1.170 | 8.250 | 35.657 | 37.121 | 1.00x | **0.751** |
+| `random` | `vantage_lz4_block_1t` | 1185.76 | 6.747 | 0.650 | 0.699 | 8.432 | 8.816 | 1.00x | **0.754** |
+| `random` | `vantage_lz4_block_raw` | **2601.75** | **3.075** | 1.189 | 0.904 | 4.864 | 5.116 | 1.00x | **0.754** |
+
+**Root-Cause Finding:** Under exact codec parity (`lz4.block.compress`, no CRC32), `256 KiB` `memoryview` chunking (`vantage_lz4_block_raw`) is **2.1x–4.6x faster** than one-shot 8 MiB `python_lz4_block_naive` (`6180` vs `1328 MB/s` on `repeated`; `2601` vs `728 MB/s` on `random`) and reduces Python peak heap allocation by **10x–31x** (`0.25–0.75 MB` vs `8.0–16.0 MB`).
+
+### 2. Isolated Subprocess Full-Lifecycle Peak RSS (`8 MiB random`)
+
+Measured in a fresh Python process per baseline ([`benchmarks/isolated_memory_bench.py`](benchmarks/isolated_memory_bench.py)):
+- `RSS_Start`: `~21.2–21.4 MB` · `RSS_Input` (after 8 MiB dataset): `~30.1–30.4 MB`
+- `Peak_RSS`: `64.14–64.98 MB` across all baselines (`~34.1–34.9 MB` processing/runtime working set).
+
+### 3. Separate Real BPE Tokenization Baseline (`tiktoken cl100k_base`)
 Measured on a **1 MiB slice** of `ai_corpus` (`1,048,576` bytes → `251,940` actual tokens):
-- **Median Latency:** `87.03 ms`
-- **Actual Tokenization Speed:** `2,894,804.0 tokens/s` (`11.49 MB/s`)
-- **Key Takeaway:** BPE tokenization is **~80x–110x slower** than LZ4 byte-stream processing, confirming that byte compression cannot be equated with LLM token throughput.
+- **Median Time:** `88.24 ms` → **`2,855,145.1 tokens/s`** (`11.33 MB/s`)
+- *Note:* This is a standalone tokenizer baseline—not LLM inference, not token generation, and not accelerated by Vantage.
 
 ---
 
-## Limitations & Non-Claims
+## Limitations & Next Steps
 
-1. **Not an LLM Inference Engine:** Vantage optimizes byte-stream transport, chunking, and compression—not transformer attention or token generation.
-2. **Python Interpreter RSS:** While Python heap allocation during streaming is `0.25–0.75 MB`, full-process Peak RSS is `94–120 MB` due to the Python runtime, loaded libraries, and pre-generated 8 MiB datasets.
-3. **Thread-Pool Overhead at 8 MiB:** `ParallelStreamProcessor` (`632–847 MB/s`) is slower than single-threaded `StatelessStreamProcessor` at 8 MiB because `ThreadPoolExecutor` dispatch overhead exceeds the ~7–10 ms compute time.
-4. **Entropy Sensitivity:** Compression ratios drop from `238x` (`repeated`) to `6.9x` (`json_records`) and `1.00x` (`random`).
+1. **No End-to-End LLM Runtime Integration Yet:** Following guidance from *MLSysBook Vol. I*, proving AI-system impact requires integrating a real quantized edge runtime (e.g., `llama.cpp` / ONNX Runtime) to measure TTFT, end-to-end tokens/s, and total working memory.
+2. **Thread-Pool Overhead at 8 MiB:** `ParallelStreamProcessor` was slower than single-threaded execution on 8 MiB payloads due to `ThreadPoolExecutor` dispatch overhead.
+3. **Cross-Machine Validation:** Results above are from a single Intel 6C/12T Windows 11 machine; Linux/ARM edge validation is pending.
 
 ---
 
@@ -83,10 +97,7 @@ git clone https://github.com/khoadev-vn/VANTAGE-V-AI.git
 cd VANTAGE-V-AI
 pip install -r requirements.txt
 
-# Run unit tests
 pytest tests/test_engine.py -v
-
-# Run full scientific benchmark suite
 python benchmarks/vantage_validation.py
 ```
 
