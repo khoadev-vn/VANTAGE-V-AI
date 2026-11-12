@@ -1,0 +1,124 @@
+{
+  "hardware": {
+    "cpu": "Intel64 Family 6 Model 165 Stepping 3",
+    "cores": "6C / 12T",
+    "python": "3.12.10",
+    "torch": "2.9.1+cpu"
+  },
+  "model_architecture": {
+    "n_layer": 4,
+    "n_head": 4,
+    "n_embd": 256,
+    "head_dim": 64
+  },
+  "prompt_checkpoint_scaling": [
+    {
+      "context_tokens": 256,
+      "raw_kv_kb": 2048.0,
+      "lz4_compressed_kb": 2056.296875,
+      "fp8_compressed_kb": 514.2734375,
+      "lz4_compression_ratio": 1.0,
+      "fp8_compression_ratio": 3.98,
+      "checkpoint_time_ms": 10.35,
+      "restore_time_ms": 3.06,
+      "bit_for_bit_lossless_parity": true
+    },
+    {
+      "context_tokens": 512,
+      "raw_kv_kb": 4096.0,
+      "lz4_compressed_kb": 4112.328125,
+      "fp8_compressed_kb": 1028.28125,
+      "lz4_compression_ratio": 1.0,
+      "fp8_compression_ratio": 3.98,
+      "checkpoint_time_ms": 25.99,
+      "restore_time_ms": 4.06,
+      "bit_for_bit_lossless_parity": true
+    },
+    {
+      "context_tokens": 1024,
+      "raw_kv_kb": 8192.0,
+      "lz4_compressed_kb": 8224.3984375,
+      "fp8_compressed_kb": 2056.296875,
+      "lz4_compression_ratio": 1.0,
+      "fp8_compression_ratio": 3.98,
+      "checkpoint_time_ms": 35.86,
+      "restore_time_ms": 30.61,
+      "bit_for_bit_lossless_parity": true
+    },
+    {
+      "context_tokens": 2048,
+      "raw_kv_kb": 16384.0,
+      "lz4_compressed_kb": 16448.5234375,
+      "fp8_compressed_kb": 4112.328125,
+      "lz4_compression_ratio": 1.0,
+      "fp8_compression_ratio": 3.98,
+      "checkpoint_time_ms": 74.76,
+      "restore_time_ms": 71.48,
+      "bit_for_bit_lossless_parity": true
+    },
+    {
+      "context_tokens": 4096,
+      "raw_kv_kb": 32768.0,
+      "lz4_compressed_kb": 32896.7734375,
+      "fp8_compressed_kb": 8224.3984375,
+      "lz4_compression_ratio": 1.0,
+      "fp8_compression_ratio": 3.98,
+      "checkpoint_time_ms": 138.03,
+      "restore_time_ms": 76.49,
+      "bit_for_bit_lossless_parity": true
+    }
+  ],
+  "streaming_generation_scaling": [
+    {
+      "prompt_tokens": 256,
+      "generated_tokens": 128,
+      "window_size": 256,
+      "block_size": 32,
+      "standard_cache": {
+        "active_kv_kb": 3064.0,
+        "throughput_tok_s": 127.78
+      },
+      "vantage_streaming_cache": {
+        "active_kv_kb": 2296.0,
+        "offloaded_compressed_kb": 771.8203125,
+        "active_kv_reduction_pct": 25.1,
+        "throughput_tok_s": 120.0,
+        "throughput_retention_pct": 93.9
+      }
+    },
+    {
+      "prompt_tokens": 1024,
+      "generated_tokens": 128,
+      "window_size": 256,
+      "block_size": 32,
+      "standard_cache": {
+        "active_kv_kb": 9208.0,
+        "throughput_tok_s": 77.96
+      },
+      "vantage_streaming_cache": {
+        "active_kv_kb": 2296.0,
+        "offloaded_compressed_kb": 6946.3828125,
+        "active_kv_reduction_pct": 75.1,
+        "throughput_tok_s": 80.01,
+        "throughput_retention_pct": 102.6
+      }
+    },
+    {
+      "prompt_tokens": 2048,
+      "generated_tokens": 128,
+      "window_size": 256,
+      "block_size": 32,
+      "standard_cache": {
+        "active_kv_kb": 17400.0,
+        "throughput_tok_s": 53.69
+      },
+      "vantage_streaming_cache": {
+        "active_kv_kb": 2296.0,
+        "offloaded_compressed_kb": 15179.1328125,
+        "active_kv_reduction_pct": 86.8,
+        "throughput_tok_s": 60.91,
+        "throughput_retention_pct": 113.4
+      }
+    }
+  ]
+}

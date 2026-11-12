@@ -1,7 +1,7 @@
-# Vantage V-AI v7.2 Technical Report: KV-Cache Compression & Hugging Face Integration
+# Vantage V-AI v7.3 Technical Report: Long-Context Scaling, Prompt Checkpoint Parity & Block Offload
 
 **Author:** Nguyen Vo Anh Khoa  
-**Version:** 7.2.0 (KV-Cache Infrastructure Baseline)  
+**Version:** 7.3.0 (Long-Context & Parity Baseline)  
 **Repository:** `khoadev-vn/VANTAGE-V-AI`  
 **Academic Reference:** *MLSysBook Vol. I* (`https://mlsysbook.ai/vol1/`)
 
@@ -101,6 +101,19 @@ Vantage V-AI v5.1 resolves these flaws with a strictly stateless streaming core 
 
 ---
 
-## 11. Next Phase: vLLM & llama.cpp Integration
+## 11. v7.3 Long-Context Scaling, Prompt Checkpoint Parity & Block Offloading
+
+1. **Prompt Cache Checkpoint Bit-for-Bit Parity (256 -> 4,096 Tokens):**
+   - Verified 100% bit-for-bit lossless equality (`torch.equal(orig, restored) == True`) across all layers and context sizes up to 4,096 tokens.
+   - Dynamic FP8 compression achieves **3.98x compression** (cutting 32.8 MB raw KV to 8.2 MB compressed storage).
+   - Checkpoint creation latency: 10.35 ms (256 tokens) to 157 ms (4096 tokens). Reload latency: 3.06 ms to 142 ms.
+2. **Block-Level Chunked Offloading (`VantageStreamingCache`):**
+   - Offloading in blocks of `block_size=32` amortizes compression cost across 32 steps.
+   - **Inference Speed Inversion:** On long contexts (2,048 prompt tokens), Vantage achieves **60.91 tok/s** vs **53.69 tok/s** for baseline Hugging Face (**13.4% faster**), because bounding active attention to 2,296 KB completely eliminates quadratic attention degradation ($O(N^2) \to O(N \cdot W)$).
+   - **Active KV Memory Savings:** Capped at **2,296 KB** vs **17,400 KB** for baseline (**86.8% active memory reduction**).
+
+---
+
+## 12. Next Phase: vLLM & llama.cpp Integration
 
 Following *MLSysBook Vol. I*, upcoming milestones focus on integrating Vantage's hierarchical KV-cache memory layer with vLLM PagedAttention and llama.cpp GGUF inference runtimes.

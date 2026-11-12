@@ -1,4 +1,4 @@
-"""Vantage V-AI core streaming data processing & KV-cache package (v7.2.0)."""
+"""Vantage V-AI core streaming data processing & KV-cache package (v7.3.0)."""
 
 from core.engine import (
     AdaptiveStreamProcessor,
@@ -25,11 +25,21 @@ from core.kv import (
 )
 
 try:
-    from core.adapters.transformers import VantageDynamicCache
+    from core.adapters.transformers import (
+        VantageDynamicCache,
+        VantagePromptCheckpoint,
+        VantageStreamingCache,
+        checkpoint_prompt_cache,
+        restore_prompt_cache,
+    )
 except ImportError:
     VantageDynamicCache = None
+    VantagePromptCheckpoint = None
+    VantageStreamingCache = None
+    checkpoint_prompt_cache = None
+    restore_prompt_cache = None
 
-__version__ = "7.2.0"
+__version__ = "7.3.0"
 
 __all__ = [
     "__version__",
@@ -49,8 +59,12 @@ __all__ = [
     "StreamStats",
     "VantageDynamicCache",
     "VantageEngine",
+    "VantagePromptCheckpoint",
+    "VantageStreamingCache",
+    "checkpoint_prompt_cache",
     "compute_quantization_error",
     "decompress_stream",
     "iter_record_chunks",
     "read_framed_stream",
+    "restore_prompt_cache",
 ]

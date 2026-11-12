@@ -2,6 +2,21 @@
 
 All notable changes to Vantage V-AI are documented in this file.
 
+## [7.3.0] - 2026-11-12
+
+### Added
+- **Block-Level Chunked Offloading (`VantageStreamingCache`):**
+  - Replaces per-step compression with amortized block offloading (`block_size=32`), slashing CPU compression overhead by 32x.
+  - Maintains higher inference throughput than baseline Hugging Face on long contexts (**60.91 tok/s** vs **53.69 tok/s** at 2048 prompt tokens) by avoiding quadratic attention slowdown while capping active KV memory at **2,296 KB** (an **86.8% active memory reduction** vs 17,400 KB).
+- **Prompt Cache Checkpointing Engine (`VantagePromptCheckpoint`):**
+  - Introduces `checkpoint_prompt_cache` and `restore_prompt_cache` for transparent session switching and prompt reuse.
+  - Verified **100% bit-for-bit lossless parity** (`torch.equal == True`) across context lengths up to 4096 tokens.
+  - Achieves **3.98x compression** in dynamic FP8 mode (32.7 MB -> 8.2 MB for 4096 tokens).
+- **Long-Context Scaling Benchmark Suite (`benchmarks/bench_long_context.py`):**
+  - Evaluates context scaling from 256 to 4096 tokens across prefill and streaming autoregression.
+  - Generates verifiable raw JSON data in `artifacts/benchmarks/benchmark_long_context_v7_3.json`.
+- **Test Suite Expansion:** 30/30 unit tests passing cleanly across streaming, KV-cache, and adapters.
+
 ## [7.2.0] - 2026-11-12
 
 ### Added

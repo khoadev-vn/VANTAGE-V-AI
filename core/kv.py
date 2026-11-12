@@ -196,19 +196,12 @@ class KVCacheStreamEngine:
         scale = 1.0
 
         if quantize_fp8:
-            # Dynamic per-tensor INT8/FP8 quantization
-            if torch is not None and isinstance(key_or_val_tensor, torch.Tensor):
-                t = key_or_val_tensor.detach().cpu().to(torch.float32)
-                max_val = float(t.abs().max())
-                scale = max(max_val / 127.0, 1e-8)
-                q_t = (t / scale).round().clamp(-128, 127).to(torch.int8)
-                payload_bytes = q_t.numpy().tobytes()
-            else:
-                arr = np.asarray(key_or_val_tensor, dtype=np.float32)
-                max_val = float(np.max(np.abs(arr)))
-                scale = max(max_val / 127.0, 1e-8)
-                q_arr = np.clip(np.round(arr / scale), -128, 127).astype(np.int8)
-                payload_bytes = q_arr.tobytes()
+            # Dynamic per-tensor INT8/FP8 quantization on canonical [tokens, heads, dim] layout
+            arr = np.frombuffer(raw_bytes, dtype=np.dtype(base_meta.dtype_str)).astype(np.float32)
+            max_val = float(np.max(np.abs(arr)))
+            scale = max(max_val / 127.0, 1e-8)
+            q_arr = np.clip(np.round(arr / scale), -128, 127).astype(np.int8)
+            payload_bytes = q_arr.tobytes()
         else:
             payload_bytes = raw_bytes
 
