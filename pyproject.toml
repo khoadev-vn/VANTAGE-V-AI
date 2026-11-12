@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vantage-vai"
-version = "6.3.0"
+version = "6.4.0"
 description = "A bounded-memory streaming engine designed for predictable resource usage under variable workloads."
 readme = "README.md"
 license = { file = "LICENSE" }

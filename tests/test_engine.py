@@ -19,6 +19,7 @@ from core.engine import (
     StatelessStreamProcessor,
     VantageEngine,
     decompress_stream,
+    iter_record_chunks,
     read_framed_stream,
 )
 
@@ -245,3 +246,28 @@ def test_decompress_stream_lazy_roundtrip(tmp_path):
     with out_file.open("rb") as f:
         restored = b"".join(decompress_stream(read_framed_stream(f), codec=CodecType.LZ4_FRAME))
     assert restored == payload
+
+
+def test_iter_record_chunks_exact_token_parity(tmp_path):
+    tiktoken = pytest.importorskip("tiktoken")
+    enc = tiktoken.get_encoding("cl100k_base")
+
+    lines = [
+        f"[{i:05d}] Bounded-memory streaming preserves exact token boundaries.\n".encode("utf-8")
+        for i in range(4000)
+    ]
+    payload = b"".join(lines)
+    full_tokens = enc.encode(payload.decode("utf-8"))
+
+    proc = StatelessStreamProcessor(chunk_bytes=16 * 1024, codec=CodecType.LZ4_BLOCK)
+    out_file = tmp_path / "parity.vnt"
+    with out_file.open("wb") as f:
+        proc.process(payload, FileSink(f, framed=True))
+
+    stream_tokens = []
+    with out_file.open("rb") as f:
+        decompressed = decompress_stream(read_framed_stream(f), codec=CodecType.LZ4_BLOCK)
+        for aligned in iter_record_chunks(decompressed, delimiter=b"\n"):
+            stream_tokens.extend(enc.encode(aligned.decode("utf-8")))
+
+    assert stream_tokens == full_tokens

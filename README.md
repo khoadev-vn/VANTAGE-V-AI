@@ -2,12 +2,12 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-17%20Passing-brightgreen.svg)](tests/test_engine.py)
+[![Tests](https://img.shields.io/badge/Tests-18%20Passing%20(Local)-brightgreen.svg)](tests/test_engine.py)
 
-**Vantage V-AI (v6.3.0)** is a **bounded-memory streaming engine designed for predictable resource usage under variable workloads**.
+**Vantage V-AI (v6.4.0)** is a **bounded-memory streaming engine designed for predictable resource usage under variable workloads**.
 
 > **Scientific Positioning:**
-> Vantage V-AI is **not** a new compression algorithm and **not** an LLM inference runtime. Its contribution is a **bounded-memory streaming architecture** (`process_iter`, `BoundedMemorySink`, `FileSink` with partial-write safety and length-prefixed framing, `decompress_stream`) that keeps OS `Peak RSS` flat across `16 GiB` streams (`~23.8–27.7 MB`) and reduces End-to-End AI tokenization `Peak RSS` by **8.2x** (`65.16 MB` vs `534.28 MB`).
+> Vantage V-AI is **not** a new compression algorithm and **not** an LLM inference runtime. Its contribution is a **bounded-memory streaming architecture** (`process_iter`, `BoundedMemorySink`, `FileSink`, `decompress_stream`, `iter_record_chunks`). During a `16 GiB` streaming run, sampled process RSS remained within `23.8–27.7 MB`, with no observable growth proportional to the amount of data processed. In End-to-End `tiktoken` preprocessing (`16 MiB ai_corpus`), Vantage achieves **100% bit-for-bit token ID parity** (`4,031,088 == 4,031,088` tokens) while reducing **OS Peak RSS by 8.06x** (`66.27 MB` vs `534.37 MB`) and **Python heap peak by 35.7x** (`3.786 MB` vs `135.067 MB`).
 
 ---
 
@@ -157,13 +157,23 @@ Measured on a **1 MiB slice** of `ai_corpus` (`1,048,576` bytes → `251,940` ac
 | `alternating` | `adapt_h1` | 2479.97 | 5.962 | 6.452 | 6.871 | 0.553 | 15 |
 | `alternating` | `adapt_h3` | 2340.04 | 6.605 | 6.838 | 7.528 | 0.564 | 0 |
 
-#### C. End-to-End AI Preprocessing Pipeline (`16 MiB ai_corpus` → `tiktoken cl100k_base`)
-| Mode | File Size (MB) | Tokens | Time (ms) | Tokens/s | PyPeak (MB) | OS Peak RSS (MB) |
-| :--- | ---: | ---: | ---: | ---: | ---: | ---: |
-| `full_ram_baseline` | 16.000 | 4,031,088 | 4468.18 | 902,176.8 | 135.068 | 534.28 |
-| `vantage_bounded_stream` | **1.233** | 4,031,149 | **4215.93** | **956,170.5** | **3.285** | **65.16** |
+#### C. End-to-End AI Preprocessing Pipeline with 100% Token ID Parity (`v6.4.0`, [`benchmarks/v64_e2e_token_parity.py`](benchmarks/v64_e2e_token_parity.py))
+Using [`iter_record_chunks`](core/engine.py) to align decompressed `256 KiB` chunks on newline boundaries guarantees **100% identical token IDs** (`stream_token_ids == full_token_ids`, verified on `1,007,785` tokens at `4 MiB` and `4,031,088` tokens at `16 MiB`):
 
-Streaming decompressed `256 KiB` chunks lazily into `tiktoken` reduces **OS Peak RSS by 8.2x** (`65.16 MB` vs `534.28 MB`), **Python heap peak by 41.1x** (`3.285 MB` vs `135.068 MB`), and **disk footprint by 12.98x**, while running **5.6% faster end-to-end**. *(Note: chunk-boundary tokenization shifts token count by `+61` tokens / `0.0015%`; line-aligned framing can eliminate this if exact token boundaries are required.)*
+**15-Trial Latency Distribution (`4 MiB ai_corpus`, 2 warmups, 15 trials):**
+| Mode | Tokens | P25 (ms) | P50 (ms) | P75 (ms) | Std (ms) | Tokens/s (P50) |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `full_ram_baseline` | 1,007,785 | 339.12 | 340.25 | 348.24 | 4.98 | 2,961,857.4 |
+| `vantage_aligned_stream` | 1,007,785 | 331.38 | **334.18** | 337.46 | 6.14 | **3,015,669.9** |
+
+**Isolated Subprocess Peak Memory (`16 MiB ai_corpus`, Exact Token Parity):**
+| Mode | File Size (MB) | Tokens | Time (ms) | PyPeak (MB) | OS Peak RSS (MB) |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| `full_ram_baseline` | 16.000 | 4,031,088 | **3767.14** | 135.067 | 534.37 |
+| `vantage_aligned_stream` | **1.233** | **4,031,088** | 4223.63 | **3.786** | **66.27** |
+
+- **8.06x lower OS Peak RSS** (`66.27 MB` vs `534.37 MB`) and **35.7x lower Python heap peak** (`3.786 MB` vs `135.067 MB`) with **0-token discrepancy**.
+- *Note on CI:* GitHub Actions CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) is configured for `ubuntu-latest` and `windows-latest` (Python `3.10–3.12`); local `pytest` (`18/18`) and `examples/quickstart.py` passed on Windows 11 / Python 3.12.10.
 
 ---
 

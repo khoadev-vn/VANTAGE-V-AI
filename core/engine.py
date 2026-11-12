@@ -277,6 +277,43 @@ def decompress_stream(
         yield decompress_chunk(frame, codec=codec)
 
 
+def iter_record_chunks(
+    chunks: Iterable[bytes],
+    delimiter: bytes = b"\n",
+) -> Iterator[bytes]:
+    """
+    Re-align a decompressed byte stream on record boundaries (e.g. newlines).
+
+    Carries over only the incomplete trailing record across chunk boundaries so
+    downstream tokenizers or parsers receive complete records and produce
+    identical output to full-file processing while keeping memory bounded.
+    """
+    if not delimiter:
+        raise ValueError("delimiter must be non-empty")
+    carry = bytearray()
+    for chunk in chunks:
+        if not chunk:
+            continue
+        if carry:
+            carry.extend(chunk)
+            data = bytes(carry)
+            carry.clear()
+        else:
+            data = chunk
+
+        last = data.rfind(delimiter)
+        if last == -1:
+            carry.extend(data)
+        else:
+            cut = last + len(delimiter)
+            yield data[:cut]
+            if cut < len(data):
+                carry.extend(data[cut:])
+
+    if carry:
+        yield bytes(carry)
+
+
 class StatelessStreamProcessor:
     """
     Strictly stateless streaming processor.

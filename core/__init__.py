@@ -1,4 +1,4 @@
-"""Vantage V-AI core streaming data processing package (v6.3.0)."""
+"""Vantage V-AI core streaming data processing package (v6.4.0)."""
 
 from core.engine import (
     AdaptiveStreamProcessor,
@@ -14,10 +14,11 @@ from core.engine import (
     StreamStats,
     VantageEngine,
     decompress_stream,
+    iter_record_chunks,
     read_framed_stream,
 )
 
-__version__ = "6.3.0"
+__version__ = "6.4.0"
 
 __all__ = [
     "__version__",
@@ -34,5 +35,6 @@ __all__ = [
     "StreamStats",
     "VantageEngine",
     "decompress_stream",
+    "iter_record_chunks",
     "read_framed_stream",
 ]
