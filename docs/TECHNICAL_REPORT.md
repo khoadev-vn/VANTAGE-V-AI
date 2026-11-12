@@ -1,7 +1,7 @@
-# Vantage V-AI v7.3.1 Technical Report: Pretrained Model Scientific Validation & Dual-Tier KV Architecture
+# Vantage V-AI v7.3.2 Technical Report: Pretrained Model Scientific Validation & Rigorous Peer-Review Audit
 
 **Author:** Nguyen Vo Anh Khoa  
-**Version:** 7.3.1 (Scientific Validation Edition)  
+**Version:** 7.3.2 (Peer-Review Audit Baseline)  
 **Repository:** `khoadev-vn/VANTAGE-V-AI`  
 **Academic Reference:** *MLSysBook Vol. I* (`https://mlsysbook.ai/vol1/`)
 
@@ -112,11 +112,14 @@ Vantage V-AI v5.1 resolves these flaws with a strictly stateless streaming core 
    - **Inference Speed Inversion:** On long contexts (2,048 prompt tokens), Vantage achieves **60.91 tok/s** vs **53.69 tok/s** for baseline Hugging Face (**13.4% faster**), because bounding active attention to 2,296 KB completely eliminates quadratic attention degradation ($O(N^2) \to O(N \cdot W)$).
    - **Active KV Memory Savings:** Capped at **2,296 KB** vs **17,400 KB** for baseline (**86.8% active memory reduction**).
 3. **Pretrained GPT-2 Evaluation (`benchmarks/bench_scientific_validation.py`):**
-   - Tested on real Hugging Face `gpt2` (124M params, 12 layers, 12 heads) with a 512-token natural language text corpus prompt.
-   - 10 independent trials: Active KV memory reduced by **50.1%** (`20.66 MB` vs `41.40 MB`), with OS Peak RSS **195.18 MB lower** (`1001.93 MB` vs `1197.11 MB`).
-   - Throughput P50: **8.54 tok/s** vs **7.46 tok/s** (+14.5% speedup).
-   - Output semantics: **89.1% token overlap** against uncompressed full-attention baseline.
-   - Prompt checkpoint on real prefill states: **100% bit-for-bit lossless identical** for LZ4; **3.99x compression** (CosSim: 0.99981, MAE: 0.02745) for dynamic FP8.
+   - Tested on real Hugging Face `gpt2` (124M params, 12 layers, 12 heads, CPU PyTorch) with a 512-token natural language text corpus prompt.
+   - 10 interleaved trials (`ABABAB...`): Active attention KV memory reduced by **50.0%** (`20.74 MB` vs `41.47 MB`).
+   - Throughput P50: **15.64 tok/s** (IQR: 0.42) vs **13.85 tok/s** (IQR: 1.29) (+12.9% throughput).
+   - Continuous background OS Peak RSS polling: `1164.12 MB` (HF) vs `1166.37 MB` (Vantage).
+   - **True Generated-Token Overlap:** Evaluated strictly on newly generated tokens `out[:, prompt_len:]`: **1 / 64 tokens (1.6%)** due to expected greedy trajectory divergence under sliding-window prompt truncation.
+   - **Prompt Checkpoint Error Profiling (Keys & Values):**
+     - Lossless LZ4: **100% bit-for-bit lossless identical** (`torch.equal == True`) for both Keys and Values.
+     - Dynamic FP8: **3.99x compression** (Keys: CosSim 0.99981, RelErr 1.87% | Values: CosSim 0.99985, RelErr 2.12%).
 
 ---
 

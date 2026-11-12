@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-30%20Passing%20(Local)-brightgreen.svg)](tests/)
 
-**Vantage V-AI (v7.3.1)** is a **bounded-memory streaming and Attention KV-Cache compression engine** designed for LLM inference runtimes (vLLM, Hugging Face Transformers, llama.cpp, coding agents).
+**Vantage V-AI (v7.3.2)** is a **bounded-memory streaming and Attention KV-Cache compression engine** designed for LLM inference runtimes (vLLM, Hugging Face Transformers, llama.cpp, coding agents).
 
 > **Scientific Positioning:**
 > Vantage V-AI solves memory pressure in AI pipelines across two critical layers:
@@ -227,22 +227,23 @@ Uses discrete chunked offload (`block_size=32`, `window_size=256`) during autore
 - **Amortized Block Offload:** Compresses only once every 32 generated tokens instead of per-step, dropping compression overhead to near zero.
 - **Raw Benchmark Artifacts:** Recorded in [`artifacts/benchmarks/benchmark_long_context_v7_3.json`](artifacts/benchmarks/benchmark_long_context_v7_3.json).
 
-#### C. Pretrained Hugging Face GPT-2 Multi-Trial Validation (`v7.3.1`, [`benchmarks/bench_scientific_validation.py`](benchmarks/bench_scientific_validation.py))
+#### C. Pretrained Hugging Face GPT-2 Multi-Trial Validation (`v7.3.2`, [`benchmarks/bench_scientific_validation.py`](benchmarks/bench_scientific_validation.py))
 
-Evaluated on official pretrained `gpt2` (12 layers, 12 attention heads, 768 hidden dimension, 124M parameters) using a 512-token natural language text prompt across **1 warmup + 10 independent trials**:
+Evaluated on official pretrained `gpt2` (12 layers, 12 attention heads, 768 hidden dimension, 124M parameters, CPU PyTorch) using a 512-token natural language text prompt across **1 warmup + 10 interleaved trials (`ABABAB...`)**:
 
-| Metric | Standard HF `DynamicCache` | Vantage Streaming (Window=256, Block=32) | Scientific Finding |
+| Metric | Standard HF `DynamicCache` | Vantage Streaming (Window=256, Block=32) | Peer-Review Audit Finding |
 | :--- | ---: | ---: | :--- |
-| **Active Attention KV Memory** | 41,400.0 KB (41.4 MB) | **20,664.0 KB (20.7 MB)** | **50.1% active memory reduction** (VRAM tier) |
-| **Offloaded Compressed Memory** | 0.0 KB | 20,824.6 KB | Offloaded to host memory tier |
-| **Total Process Peak RSS** | 1,197.11 MB | **1,001.93 MB** | **195.18 MB lower Peak RSS** at OS level |
-| **Throughput P50 (Median)** | 7.46 tok/s (Std: 1.42) | **8.54 tok/s (Std: 1.10)** | **+14.5% higher throughput P50** |
-| **Token Overlap Ratio** | 100.0% (Full Attention) | **89.1%** | High semantic coherence under local attention |
-| **Prompt Checkpoint Lossless Parity** | Baseline | **100% BIT-FOR-BIT (`torch.equal == True`)** | Exact zero-drift reconstruction on real weights |
-| **Prompt Checkpoint Dynamic FP8** | Baseline | **3.99x Compression** (CosSim: 0.99981) | MAE = 0.02745 on real prefill states |
+| **Active Attention KV Memory (CPU)** | 41,472.0 KB (40.5 MB) | **20,736.0 KB (20.3 MB)** | **50.0% active attention memory reduction** |
+| **Offloaded KV Memory (CPU)** | 0.0 KB | 20,736.0 KB | Historical prefix offloaded in host RAM |
+| **Total KV Footprint (CPU)** | 41,472.0 KB | 41,472.0 KB | Equal footprint (LZ4 offload preserves data) |
+| **Throughput P50 (Median 10 trials)** | 13.85 tok/s (IQR: 1.29) | **15.64 tok/s (IQR: 0.42)** | **+12.9% throughput P50** (lower variance) |
+| **OS Peak RSS During Run (Mean)** | 1,164.12 MB | 1,166.37 MB | Background continuous polling (~0.19% difference) |
+| **GENERATED Token Match (64 tokens)** | 64 / 64 (100.0%) | **1 / 64 (1.6%)** | **Sliding-window greedy divergence** |
+| **Prompt Checkpoint Lossless Parity** | Baseline | **Keys: True | Values: True** | 100% bit-for-bit lossless identical (`torch.equal`) |
+| **Prompt Checkpoint Dynamic FP8** | Baseline | **3.99x Compression** (RelErr < 2.2%) | Keys: CosSim 0.99981 | Values: CosSim 0.99985 |
 
-- **Transparency on Semantics:** `VantageStreamingCache` maintains an 89.1% token generation overlap with full uncompressed attention while capping active KV memory at 20.66 MB and lowering total OS Peak RSS by 195.18 MB.
-- **Artifacts:** Full raw JSON results stored at [`artifacts/benchmarks/benchmark_scientific_validation_v7_3_1.json`](artifacts/benchmarks/benchmark_scientific_validation_v7_3_1.json).
+- **Mathematical Honesty on Generated Token Overlap:** Evaluated strictly on newly generated tokens `out[:, prompt_length:]` (isolated from prompt tokens). In greedy autoregressive decoding, truncating the attention window from 512 to 256 tokens naturally causes the decoding trajectory to branch away from full global attention (matching 1/64 tokens = 1.6%). This is an inherent, well-documented trade-off of sliding-window attention without attention sinks.
+- **Artifacts:** Full raw JSON results stored at [`artifacts/benchmarks/benchmark_scientific_validation_v7_3_2.json`](artifacts/benchmarks/benchmark_scientific_validation_v7_3_2.json).
 
 ---
 

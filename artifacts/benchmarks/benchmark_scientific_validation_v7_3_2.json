@@ -1,0 +1,92 @@
+{
+  "environment": {
+    "model": "gpt2",
+    "layers": 12,
+    "heads": 12,
+    "hidden_size": 768,
+    "head_dim": 64,
+    "device": "cpu",
+    "torch_version": "2.9.1+cpu"
+  },
+  "prompt_checkpoint_evaluation": {
+    "prompt_tokens": 512,
+    "raw_kv_kb": 36864.0,
+    "lz4": {
+      "compressed_kb": 37009.3828125,
+      "compression_ratio": 1.0,
+      "checkpoint_ms": 72.42,
+      "restore_ms": 59.13,
+      "keys_bit_for_bit_identical": true,
+      "values_bit_for_bit_identical": true
+    },
+    "fp8": {
+      "compressed_kb": 9239.0654296875,
+      "compression_ratio": 3.99,
+      "checkpoint_ms": 129.14,
+      "restore_ms": 84.06,
+      "bit_for_bit_identical": false,
+      "keys": {
+        "cosine_similarity": 0.99981,
+        "mae": 0.02745,
+        "relative_error_pct": 1.87
+      },
+      "values": {
+        "cosine_similarity": 0.99985,
+        "mae": 0.01162,
+        "relative_error_pct": 2.12
+      }
+    }
+  },
+  "streaming_generation_trials": {
+    "trials": 10,
+    "prompt_tokens": 512,
+    "generated_tokens": 64,
+    "window_size": 256,
+    "block_size": 32,
+    "standard_hf": {
+      "active_kv_kb": 41472.0,
+      "offloaded_kb": 0.0,
+      "total_kv_kb": 41472.0,
+      "throughput_p50": 13.85,
+      "throughput_iqr": 1.29,
+      "throughput_raw": [
+        12.7,
+        13.79,
+        14.84,
+        12.92,
+        14.9,
+        13.5,
+        14.68,
+        13.92,
+        13.51,
+        14.94
+      ],
+      "peak_rss_mb_mean": 1164.12
+    },
+    "vantage_streaming": {
+      "active_kv_kb": 20736.0,
+      "offloaded_kb": 20736.0,
+      "total_kv_kb": 41472.0,
+      "active_reduction_pct": 50.0,
+      "throughput_p50": 15.64,
+      "throughput_iqr": 0.42,
+      "throughput_raw": [
+        16.16,
+        14.44,
+        15.31,
+        15.59,
+        15.92,
+        15.81,
+        15.76,
+        14.65,
+        15.59,
+        15.69
+      ],
+      "peak_rss_mb_mean": 1166.37,
+      "generated_tokens_evaluated": 64,
+      "generated_tokens_matched": 1,
+      "generated_token_overlap_ratio": 0.0156,
+      "full_sequence_overlap_including_prompt": 0.8906
+    }
+  }
+}
