@@ -149,31 +149,38 @@ Vantage V-AI v8.0.0 expands the runtime into three complementary experimental di
 
 ---
 
-## 14. Empirical GPU Hardware Validation on NVIDIA Tesla T4 (Qwen2.5-3B-Instruct)
+## 14. Empirical Multi-GPU Hardware Validation (2x NVIDIA Tesla T4, Qwen2.5-3B)
 
-To transition beyond CPU-only simulation (TRL 4) and observe tensor behavior under CUDA acceleration, Vantage was benchmarked in a Kaggle cloud environment provisioned with **2x NVIDIA Tesla T4 GPUs (Turing architecture, Compute Capability 7.5, 14.56 GB VRAM each)** using **`Qwen/Qwen2.5-3B-Instruct`** in FP16 precision (1024 prompt tokens, 64 generated tokens).
+To move beyond CPU-only evaluation (TRL 4), Vantage was benchmarked in an isolated Kaggle GPU cloud runtime with **2x NVIDIA Tesla T4 GPUs (Turing architecture, Compute Capability 7.5, 14.56 GB VRAM each)** using **`Qwen/Qwen2.5-3B-Instruct`** in FP16 precision.
 
-Raw trial data is preserved in [`artifacts/benchmarks/benchmark_gpu_kaggle_t4.json`](../artifacts/benchmarks/benchmark_gpu_kaggle_t4.json).
+Model parameters were distributed across both accelerators via `device_map="auto"`:
+- **Device 0 (`cuda:0`):** 1,852,704,768 parameters (~60%)
+- **Device 1 (`cuda:1`):** 1,233,233,920 parameters (~40%)
 
-### Measured GPU Performance Metrics
+All execution timings were captured using hardware-synchronized **`torch.cuda.Event(enable_timing=True)`** markers. Raw trial data is preserved in [`artifacts/benchmarks/benchmark_gpu_kaggle_v8_2.json`](../artifacts/benchmarks/benchmark_gpu_kaggle_v8_2.json).
 
-| Cache Configuration | CUDA Throughput | Peak VRAM Allocated | Peak VRAM Reserved | Token Match vs Full Context |
+### Measured GPU Performance Metrics (Prompt: 1024 tokens, Generation: 64 tokens)
+
+| Cache Configuration | CUDA Throughput | Elapsed Time | GPU 0 VRAM | Match vs Full Context |
 | :--- | :---: | :---: | :---: | :---: |
-| **Standard Hugging Face (`DynamicCache`)** | 7.46 tok/s | 3,761.42 MB | 3,790.00 MB | 64/64 (Full Context Reference) |
-| **Vantage Sliding (No Sinks, W=256)** | 11.89 tok/s | 3,755.74 MB | 3,784.00 MB | 20/64 |
-| **Vantage Streaming (`sink_tokens=4`, Lossless)** | **11.93 tok/s** | **3,755.74 MB** | **3,780.00 MB** | 17/64 |
-| **Vantage Streaming (`sink_tokens=4`, FP8)** | **10.76 tok/s** | **3,755.74 MB** | **3,780.00 MB** | 17/64 |
+| **Standard Hugging Face Full Attention** | 11.88 tok/s | 5,387.2 ms | 3,761.42 MB | 64/64 (Reference) |
+| **Vantage Streaming (W=128, Sink=4, Lossless)** | 12.25 tok/s | 5,224.8 ms | 3,755.74 MB | 17/64 (26.6%) |
+| **Vantage Streaming (W=256, No Sink, Lossless)** | 12.51 tok/s | 5,115.3 ms | 3,755.74 MB | 20/64 (31.2%) |
+| **Vantage Streaming (W=256, Sink=4, Lossless)** | 12.41 tok/s | 5,157.8 ms | 3,755.74 MB | 17/64 (26.6%) |
+| **Vantage Streaming (W=256, Sink=4, FP8)** | 10.94 tok/s | 5,849.4 ms | 3,755.74 MB | 17/64 (26.6%) |
+| **Vantage Streaming (W=512, Sink=4, Lossless)** | 12.64 tok/s | 5,065.1 ms | 3,755.74 MB | 18/64 (28.1%) |
 
-### Rigorous Scientific Review & Limitations of GPU Validation
-1. **Context-Retention vs Throughput Trade-off (1.60x Speedup):**
-   - VANTAGE achieved **1.60× higher measured throughput** (11.93 tok/s vs 7.46 tok/s) compared to the full-context Hugging Face baseline.
-   - *Scientific Clarification:* This gain stems directly from reducing attention complexity from quadratic full attention ($O(N^2)$) to a bounded active window of $W=256$ ($O(N \cdot W)$). It represents an operational trade-off (trading distant context retention for constant-time decode complexity), not an equivalent-workload computational acceleration.
-2. **VRAM Composition & KV Cache Scale:**
-   - Peak allocated VRAM differed by only **5.68 MB** (3,755.74 MB vs 3,761.42 MB, a 0.15% difference).
-   - In a 1024-token prompt on Qwen2.5-3B (which uses Grouped Query Attention with 2 KV heads), model parameters and PyTorch workspace memory account for over 99% of total VRAM. This benchmark demonstrates that VANTAGE functions correctly on CUDA hardware without memory leaks, but does **not** claim substantial overall VRAM reduction at this prompt length.
-3. **Hardware Utilization Details:**
-   - Under `device_map="auto"`, the 3.75 GB model weights and attention states were accommodated entirely within **Device 0 (Tesla T4 #1)**. Device 1 remained idle as the model did not require pipeline tensor parallelism.
-   - Timings were synchronized using PyTorch CUDA synchronization barriers and verified with CUDA Events in benchmark script `benchmarks/kaggle_gpu_benchmark.py`.
+### Key Scientific Takeaways & Pairwise Verification
+1. **Pairwise Lossless vs FP8 Parity (64/64 Exact Match):**
+   - Direct token-by-token comparison between `vantage_w256_sink4` (Lossless) and `vantage_w256_sink4_fp8` yielded **64/64 identical generated tokens (100.0% exact parity)**.
+   - *Interpretation:* In this specific test workload, dynamic FP8 quantization during block offload introduced **no additional output token drift** beyond the trajectory divergence inherent to sliding-window context reduction.
+2. **Timing Analysis with CUDA Events:**
+   - Under CUDA Event synchronization across warmed-up runs, bounding the active attention context yielded a modest **4.2% – 6.0% reduction in total elapsed time** (5,157.8 ms vs 5,387.2 ms) at 1024 prompt tokens.
+   - Initial un-warmed measurements had reported larger apparent speedups due to cold-start compilation and kernel launch latency in the reference baseline.
+3. **Quantization Computational Trade-off:**
+   - FP8 offload throughput (10.94 tok/s) was slightly lower than Lossless (12.41 tok/s), reflecting the CPU-side quantization and dequantization math overhead present in the Python prototype runtime.
+4. **VRAM Footprint at 1K Context:**
+   - Peak allocated VRAM showed an expected minor reduction of 5.68 MB (3,755.74 MB vs 3,761.42 MB), reflecting that at 1024 tokens on a Grouped Query Attention (GQA, 2 KV heads) model, the 3.75 GB model weights and PyTorch allocator overhead constitute >99% of GPU memory.
 
 
 

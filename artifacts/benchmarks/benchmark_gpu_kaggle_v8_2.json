@@ -1,0 +1,67 @@
+{
+  "benchmark_environment": "Kaggle Cloud Platform (2x NVIDIA Tesla T4)",
+  "hardware": {
+    "device_0": "Tesla T4 (14.56 GB, CC 7.5)",
+    "device_1": "Tesla T4 (14.56 GB, CC 7.5)",
+    "parameter_distribution": {
+      "cuda:0": 1852704768,
+      "cuda:1": 1233233920
+    }
+  },
+  "workload": {
+    "model_id": "Qwen/Qwen2.5-3B-Instruct",
+    "prompt_tokens": 1024,
+    "generated_tokens": 64,
+    "precision": "torch.float16",
+    "timing_method": "torch.cuda.Event(enable_timing=True)"
+  },
+  "results": {
+    "standard_hf_full": {
+      "label": "Standard Hugging Face Full Attention",
+      "throughput_tok_s": 11.88,
+      "elapsed_ms": 5387.2,
+      "gpu_0_vram_mb": 3761.42,
+      "match_vs_full": "64/64"
+    },
+    "vantage_w128_sink4": {
+      "label": "Vantage Streaming (W=128, Sink=4, Lossless)",
+      "throughput_tok_s": 12.25,
+      "elapsed_ms": 5224.8,
+      "gpu_0_vram_mb": 3755.74,
+      "match_vs_full": "17/64"
+    },
+    "vantage_w256_nosink": {
+      "label": "Vantage Streaming (W=256, No Sink, Lossless)",
+      "throughput_tok_s": 12.51,
+      "elapsed_ms": 5115.3,
+      "gpu_0_vram_mb": 3755.74,
+      "match_vs_full": "20/64"
+    },
+    "vantage_w256_sink4": {
+      "label": "Vantage Streaming (W=256, Sink=4, Lossless)",
+      "throughput_tok_s": 12.41,
+      "elapsed_ms": 5157.8,
+      "gpu_0_vram_mb": 3755.74,
+      "match_vs_full": "17/64"
+    },
+    "vantage_w256_sink4_fp8": {
+      "label": "Vantage Streaming (W=256, Sink=4, FP8)",
+      "throughput_tok_s": 10.94,
+      "elapsed_ms": 5849.4,
+      "gpu_0_vram_mb": 3755.74,
+      "match_vs_full": "17/64"
+    },
+    "vantage_w512_sink4": {
+      "label": "Vantage Streaming (W=512, Sink=4, Lossless)",
+      "throughput_tok_s": 12.64,
+      "elapsed_ms": 5065.1,
+      "gpu_0_vram_mb": 3755.74,
+      "match_vs_full": "18/64"
+    }
+  },
+  "pairwise_parity": {
+    "lossless_vs_fp8_exact_parity": true,
+    "lossless_vs_fp8_match": "64/64",
+    "full_vs_lossless_drift": "17/64"
+  }
+}
