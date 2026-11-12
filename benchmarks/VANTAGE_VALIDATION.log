@@ -1,28 +1,41 @@
-
-============================================================
-VANTAGE V-AI OFFICIAL VALIDATION LOG
-Time: 2026-05-02 00:08:10
-============================================================
-[SYSTEM INFO]
-Founder: Nguyen Vo Anh Khoa
-Version: 4.0.0-ELITE
-Engine:  Stateless LZ4 Stream (High-Speed)
-OS:      Windows 11
-CPU:     Intel64 Family 6 Model 165 Stepping 3, GenuineIntel (12 Threads)
-RAM:     15 GB
-
-[BENCHMARK DATA]
-Target Records: 5,000,000
-Target Tokens:  100.0 Million
-Batch Size:     25000
-
-[PERFORMANCE RESULTS]
-Throughput:     3861.73 Million Tokens/s
-Total Time:     0.0259 seconds
-RAM Increment:  1.20 MB
-Efficiency:     193,086,723 records/s
-
-[FINAL RATING]
-Rank:           S++ (Godlike)
-Status:         VERIFIED BY VANTAGE CORE
-============================================================
+============================================================================================
+VANTAGE V-AI v5.0 — SCIENTIFIC VALIDATION & BENCHMARK LOG
+============================================================================================
+Timestamp (UTC): 2026-11-12T14:43:29.038080+00:00
+Git SHA:         105052a
+OS / Arch:       Windows 11 (AMD64)
+CPU:             Intel64 Family 6 Model 165 Stepping 3, GenuineIntel (6C / 12T)
+System RAM:      15.9 GB
+Python:          3.12.10
+Packages:        {'lz4': '4.4.5', 'psutil': '7.2.0', 'numpy': '2.3.5', 'pyarrow': '25.0.1', 'tiktoken': '0.14.0'}
+Protocol:        8 MiB/dataset, 1 warmup, 7 trials, CRC32 + roundtrip verified
+--------------------------------------------------------------------------------------------
+Dataset       Baseline                MB/s(P50)   P50(ms)   P95(ms)   P99(ms)   Ratio  PyPeak(MB)  RSSPeak(MB)   OK
+--------------------------------------------------------------------------------------------
+repeated      python_lz4_naive          1380.95     5.793     6.238     6.309 242.19x       8.034        94.11 PASS
+repeated      pyarrow_lz4               1337.72     5.980     6.239     6.253 242.25x       8.001        95.12 PASS
+repeated      vantage_lz4_frame_1t      1138.83     7.025     8.393     8.701 225.99x       0.254       103.53 PASS
+repeated      vantage_lz4_block_1t      1274.00     6.279     6.988     7.067 238.75x       0.254       103.53 PASS
+repeated      vantage_lz4_parallel       847.54     9.439    10.122    10.136 234.06x       2.551       104.07 PASS
+json_records  python_lz4_naive           775.83    10.312    12.742    12.801   6.95x       9.153       104.80 PASS
+json_records  pyarrow_lz4                854.47     9.363     9.612     9.658   6.95x       8.001       104.80 PASS
+json_records  vantage_lz4_frame_1t       764.69    10.462    10.592    10.608   6.90x       0.324       105.09 PASS
+json_records  vantage_lz4_block_1t       867.28     9.224     9.557     9.660   6.90x       0.325       105.09 PASS
+json_records  vantage_lz4_parallel       815.59     9.809    10.362    10.484   6.92x       3.202       105.55 PASS
+ai_corpus     python_lz4_naive          1020.19     7.842     8.012     8.036  13.24x       8.605       105.55 PASS
+ai_corpus     pyarrow_lz4               1077.14     7.427     7.792     7.842  13.24x       8.001       105.55 PASS
+ai_corpus     vantage_lz4_frame_1t       904.04     8.849     9.372     9.424  12.97x       0.290       105.55 PASS
+ai_corpus     vantage_lz4_block_1t      1040.56     7.688     8.280     8.379  12.99x       0.291       105.55 PASS
+ai_corpus     vantage_lz4_parallel       834.08     9.592    11.514    12.040  13.11x       2.562       105.55 PASS
+random        python_lz4_naive           598.60    13.365    16.470    17.406   1.00x      16.001       119.69 PASS
+random        pyarrow_lz4                783.49    10.211    10.650    10.670   1.00x       8.001       119.69 PASS
+random        vantage_lz4_frame_1t       894.15     8.947     9.068     9.103   1.00x       0.751       119.69 PASS
+random        vantage_lz4_block_1t      1188.14     6.733     7.001     7.008   1.00x       0.754       119.69 PASS
+random        vantage_lz4_parallel       632.18    12.655    13.344    13.456   1.00x       8.539       119.69 PASS
+--------------------------------------------------------------------------------------------
+SEPARATE REAL TOKENIZATION BASELINE (NOT CONFLATED WITH BYTE COMPRESSION):
+  Tokenizer:     tiktoken (cl100k_base)
+  Input Slice:   1048576 bytes -> 251940 actual tokens
+  Median Time:   87.03 ms
+  Real Speed:    2,894,804.0 tokens/s (11.49 MB/s)
+============================================================================================
