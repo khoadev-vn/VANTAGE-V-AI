@@ -136,19 +136,44 @@ class KVCacheStreamEngine:
     def _extract_raw_bytes(self, tensor_or_array) -> Tuple[bytes, KVCacheMetadata]:
         if torch is not None and isinstance(tensor_or_array, torch.Tensor):
             t = tensor_or_array.detach().cpu().contiguous()
-            num_tokens, num_heads, head_dim = t.shape[0], t.shape[1], t.shape[2]
-            raw_bytes = t.numpy().tobytes()
-            meta = KVCacheMetadata(
-                layer_idx=0,
-                num_heads=num_heads,
-                head_dim=head_dim,
-                num_tokens=num_tokens,
-                dtype_str=str(t.dtype).replace("torch.", ""),
-            )
-            return raw_bytes, meta
+            # Handle both 4D [batch, heads, seq, dim] and 3D [seq, heads, dim]
+            if t.dim() == 4:
+                # Shape: [batch, heads, seq, dim] -> reshape to [seq, batch * heads, dim]
+                b, h, s, d = t.shape
+                t_flat = t.permute(2, 0, 1, 3).reshape(s, b * h, d).contiguous()
+                raw_bytes = t_flat.numpy().tobytes()
+                meta = KVCacheMetadata(
+                    layer_idx=0,
+                    num_heads=b * h,
+                    head_dim=d,
+                    num_tokens=s,
+                    dtype_str=str(t.dtype).replace("torch.", ""),
+                )
+                return raw_bytes, meta
+            elif t.dim() == 3:
+                num_tokens, num_heads, head_dim = t.shape[0], t.shape[1], t.shape[2]
+                raw_bytes = t.numpy().tobytes()
+                meta = KVCacheMetadata(
+                    layer_idx=0,
+                    num_heads=num_heads,
+                    head_dim=head_dim,
+                    num_tokens=num_tokens,
+                    dtype_str=str(t.dtype).replace("torch.", ""),
+                )
+                return raw_bytes, meta
 
         if isinstance(tensor_or_array, np.ndarray):
             arr = np.ascontiguousarray(tensor_or_array)
+            if arr.ndim == 4:
+                b, h, s, d = arr.shape
+                arr_flat = np.ascontiguousarray(arr.transpose(2, 0, 1, 3).reshape(s, b * h, d))
+                return arr_flat.tobytes(), KVCacheMetadata(
+                    layer_idx=0,
+                    num_heads=b * h,
+                    head_dim=d,
+                    num_tokens=s,
+                    dtype_str=str(arr.dtype),
+                )
             num_tokens, num_heads, head_dim = arr.shape[0], arr.shape[1], arr.shape[2]
             return arr.tobytes(), KVCacheMetadata(
                 layer_idx=0,

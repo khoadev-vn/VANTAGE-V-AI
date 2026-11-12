@@ -1,4 +1,4 @@
-"""Vantage V-AI core streaming data processing package (v6.4.0)."""
+"""Vantage V-AI core streaming data processing & KV-cache package (v7.2.0)."""
 
 from core.engine import (
     AdaptiveStreamProcessor,
@@ -24,7 +24,12 @@ from core.kv import (
     compute_quantization_error,
 )
 
-__version__ = "7.1.0"
+try:
+    from core.adapters.transformers import VantageDynamicCache
+except ImportError:
+    VantageDynamicCache = None
+
+__version__ = "7.2.0"
 
 __all__ = [
     "__version__",
@@ -42,6 +47,7 @@ __all__ = [
     "ParallelStreamProcessor",
     "StatelessStreamProcessor",
     "StreamStats",
+    "VantageDynamicCache",
     "VantageEngine",
     "compute_quantization_error",
     "decompress_stream",

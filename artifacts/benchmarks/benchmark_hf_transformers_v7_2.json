@@ -1,0 +1,44 @@
+{
+  "standard_dynamic_cache": {
+    "time_sec": 0.28514569999970263,
+    "tokens_per_sec": 224.4466600761181,
+    "peak_rss_mb": 425.6796875,
+    "active_tensor_kb": 508.0,
+    "offloaded_compressed_kb": 0.0,
+    "tokens_generated": 64
+  },
+  "vantage_dynamic_cache_lossless": {
+    "time_sec": 0.48695609999958833,
+    "tokens_per_sec": 131.42868525531173,
+    "peak_rss_mb": 427.9140625,
+    "active_tensor_kb": 128.0,
+    "offloaded_compressed_kb": 381.7578125,
+    "exact_token_match": false,
+    "tokens_generated": 64
+  },
+  "vantage_dynamic_cache_fp8": {
+    "time_sec": 0.5748831999990216,
+    "tokens_per_sec": 111.32696172041368,
+    "peak_rss_mb": 430.265625,
+    "active_tensor_kb": 128.0,
+    "offloaded_compressed_kb": 95.640625,
+    "exact_token_match": false,
+    "token_overlap_ratio": 0.5703125,
+    "tokens_generated": 64
+  },
+  "restored_cache_fidelity": {
+    "restored_shape": [
+      1,
+      4,
+      127,
+      32
+    ],
+    "expected_shape": [
+      1,
+      4,
+      127,
+      32
+    ],
+    "lossless_fidelity_match": false
+  }
+}

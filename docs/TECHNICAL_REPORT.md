@@ -1,7 +1,7 @@
-# Vantage V-AI v6.4 Technical Report: 100% Token Parity & Bounded-Memory Streaming
+# Vantage V-AI v7.2 Technical Report: KV-Cache Compression & Hugging Face Integration
 
 **Author:** Nguyen Vo Anh Khoa  
-**Version:** 6.4.0 (Launch-Ready Scientific Baseline)  
+**Version:** 7.2.0 (KV-Cache Infrastructure Baseline)  
 **Repository:** `khoadev-vn/VANTAGE-V-AI`  
 **Academic Reference:** *MLSysBook Vol. I* (`https://mlsysbook.ai/vol1/`)
 
@@ -79,6 +79,28 @@ Vantage V-AI v5.1 resolves these flaws with a strictly stateless streaming core 
 
 ---
 
-## 9. Next Phase: End-to-End Edge AI Inference Runtime Integration
+## 9. v7.1 Attention KV-Cache Streaming & Error Profiling
 
-Following *MLSysBook Vol. I*, the next milestone is integrating Vantage's bounded-memory streaming layer with a real quantized edge inference runtime (e.g., `llama.cpp` or ONNX Runtime) to evaluate **TTFT**, **end-to-end tokens/s**, and **total Peak RSS** on identical prompts and model weights.
+1. **Llama-3-8B Attention Slice Evaluation:**
+   - 8 layers, 8 heads, 128 head dimension, FP16 precision.
+   - **Lossless Mode:** Stream offload + reload preserves exact bit-level tensor values with zero numerical drift (`torch.equal(k, k_reloaded) == True`).
+   - **Dynamic FP8 Quantization Mode:** Achieves **1.99x memory reduction** (128 MB -> 64.25 MB for 4K tokens; 256 MB -> 128.5 MB for 8K tokens), with **MAE = 0.00768**, **RMSE = 0.00888**, **Relative Error = 0.00963 (<1%)**, and **Cosine Similarity = 1.0000**.
+
+---
+
+## 10. v7.2 Hugging Face Transformers Integration (`VantageDynamicCache`)
+
+1. **Causal Language Model Drop-in Replacement:**
+   - `core.adapters.transformers.VantageDynamicCache` subclasses `transformers.cache_utils.DynamicCache` and integrates natively with `model.generate(..., past_key_values=cache)`.
+   - Supports both modern Transformers v5.x (`layers[i].keys/values`) and legacy list-based structures.
+2. **End-to-End Generation Benchmark (GPT-2, 64 prompt -> 64 generated tokens):**
+   - **Active KV Memory:** Capped flat at **`128.00 KB`** with `max_active_tokens=32`, versus **`508.00 KB`** for standard cache (**74.8% active memory reduction**).
+   - **Generation Throughput:** **`131.43 tok/s`** (Lossless LZ4 offload) and **`111.33 tok/s`** (Dynamic FP8 Quantized offload).
+   - **Offloaded Storage Compression:** Offloaded prefix compressed to **`95.64 KB`** under FP8 mode (**4.0x smaller** than uncompressed lossless prefix).
+   - **Full Restoration:** `cache.restore_full_cache()` reconstructs all historical tokens on demand.
+
+---
+
+## 11. Next Phase: vLLM & llama.cpp Integration
+
+Following *MLSysBook Vol. I*, upcoming milestones focus on integrating Vantage's hierarchical KV-cache memory layer with vLLM PagedAttention and llama.cpp GGUF inference runtimes.

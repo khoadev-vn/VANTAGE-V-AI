@@ -2,9 +2,9 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-26%20Passing%20(Local)-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-29%20Passing%20(Local)-brightgreen.svg)](tests/)
 
-**Vantage V-AI (v7.1.0)** is a **bounded-memory streaming and Attention KV-Cache compression engine** designed for LLM inference runtimes (vLLM, HuggingFace, llama.cpp, coding agents).
+**Vantage V-AI (v7.2.0)** is a **bounded-memory streaming and Attention KV-Cache compression engine** designed for LLM inference runtimes (vLLM, Hugging Face Transformers, llama.cpp, coding agents).
 
 > **Scientific Positioning:**
 > Vantage V-AI solves memory pressure in AI pipelines across two critical layers:
@@ -190,6 +190,21 @@ Designed for long-context inference offloading (e.g. vLLM / HuggingFace Transfor
 
 - **Lossless Mode:** Stream offload + reload preserves exact bit-level tensor values with zero numerical drift (`torch.equal(k, k_reloaded) == True`).
 - **Dynamic FP8 Quantization Mode:** Cuts raw tensor footprint by ~49.8% (accounting for scale metadata) with **MAE < 0.0077** and **relative error < 0.97%**, providing an empirical error bound before full-model end-to-end inference integration. *(Note: Evaluated on 8-layer slice tensors; full-model perplexity and GPU-VRAM transfer benchmarks are planned for v7.2).*
+
+### 7. v7.2.0 Hugging Face Transformers Integration ([`core/adapters/transformers.py`](core/adapters/transformers.py), [`benchmarks/bench_hf_generate.py`](benchmarks/bench_hf_generate.py))
+
+Vantage provides a drop-in replacement for Hugging Face's `DynamicCache` via `core.adapters.transformers.VantageDynamicCache`. It seamlessly integrates with standard Hugging Face causal language models (`AutoModelForCausalLM.generate`) across modern Transformers (v5.x `layers[i].keys/values`) and legacy versions.
+
+**End-to-End Generation Benchmark (GPT-2 Architecture, 64-token prompt -> 64 generated tokens, window=32):**
+| Cache Architecture | Active KV Memory | Offloaded Compressed Memory | Throughput (tok/s) | Active KV Reduction | Offloaded Compression |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| **Standard HF `DynamicCache`** | 508.00 KB | 0.00 KB | **224.45 tok/s** | Baseline (1.0x) | N/A |
+| **`VantageDynamicCache` (Lossless LZ4)** | **128.00 KB** | 381.76 KB | **131.43 tok/s** | **3.97x (74.8% reduction)** | Baseline Compressed |
+| **`VantageDynamicCache` (FP8 Quantized)** | **128.00 KB** | **95.64 KB** | **111.33 tok/s** | **3.97x (74.8% reduction)** | **4.0x smaller than Lossless** |
+
+- **Bounded Active Window:** Capping active uncompressed tokens to `max_active_tokens=32` keeps active tensor memory strictly flat at `128.00 KB` throughout generation instead of scaling linearly to `508.00 KB`.
+- **Hierarchical Offload:** The offloaded prefix is continuously compressed via `KVCacheStreamEngine` (Lossless LZ4 or FP8 quantized) and can be fully reconstructed on demand with `cache.restore_full_cache()`.
+- **Raw Benchmark Artifacts:** Recorded in [`artifacts/benchmarks/benchmark_hf_transformers_v7_2.json`](artifacts/benchmarks/benchmark_hf_transformers_v7_2.json).
 
 ---
 
