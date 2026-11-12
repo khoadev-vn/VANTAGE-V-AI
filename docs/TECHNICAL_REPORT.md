@@ -151,22 +151,29 @@ Vantage V-AI v8.0.0 expands the runtime into three complementary experimental di
 
 ## 14. Empirical GPU Hardware Validation on NVIDIA Tesla T4 (Qwen2.5-3B-Instruct)
 
-To transition beyond CPU-only simulation (TRL 4) and validate tensor operations on real CUDA accelerator hardware, Vantage was benchmarked on **2x NVIDIA Tesla T4 GPUs (32 GB total VRAM, Compute Capability 7.5)** using the modern **`Qwen/Qwen2.5-3B-Instruct`** model (36 layers, 16 attention heads, 2 GQA KV heads, FP16 precision, 1024 prompt tokens, 64 generated tokens).
+To transition beyond CPU-only simulation (TRL 4) and observe tensor behavior under CUDA acceleration, Vantage was benchmarked in a Kaggle cloud environment provisioned with **2x NVIDIA Tesla T4 GPUs (Turing architecture, Compute Capability 7.5, 14.56 GB VRAM each)** using **`Qwen/Qwen2.5-3B-Instruct`** in FP16 precision (1024 prompt tokens, 64 generated tokens).
 
 Raw trial data is preserved in [`artifacts/benchmarks/benchmark_gpu_kaggle_t4.json`](../artifacts/benchmarks/benchmark_gpu_kaggle_t4.json).
 
 ### Measured GPU Performance Metrics
 
-| Cache Configuration | CUDA Throughput | Peak VRAM Allocated | Peak VRAM Reserved | Generated Token Parity |
+| Cache Configuration | CUDA Throughput | Peak VRAM Allocated | Peak VRAM Reserved | Token Match vs Full Context |
 | :--- | :---: | :---: | :---: | :---: |
-| **Standard Hugging Face (`DynamicCache`)** | 7.46 tok/s | 3,761.42 MB | 3,790.00 MB | 64/64 (Baseline) |
+| **Standard Hugging Face (`DynamicCache`)** | 7.46 tok/s | 3,761.42 MB | 3,790.00 MB | 64/64 (Full Context Reference) |
 | **Vantage Sliding (No Sinks, W=256)** | 11.89 tok/s | 3,755.74 MB | 3,784.00 MB | 20/64 |
 | **Vantage Streaming (`sink_tokens=4`, Lossless)** | **11.93 tok/s** | **3,755.74 MB** | **3,780.00 MB** | 17/64 |
 | **Vantage Streaming (`sink_tokens=4`, FP8)** | **10.76 tok/s** | **3,755.74 MB** | **3,780.00 MB** | 17/64 |
 
-### Engineering Takeaways from GPU Validation
-1. **+59.9% CUDA Throughput Speedup:** By bounding the active attention computation on GPU to $W=256$, `VantageStreamingCache` achieved **11.93 tok/s** vs **7.46 tok/s** (+59.9% speedup) over standard full attention on a 1024-token context.
-2. **Lossless vs FP8 Parity Confirmed on GPU:** Both Lossless and FP8 streaming modes produced the exact same token continuation (`17/64` match against full attention baseline), demonstrating that FP8 quantization in offloaded storage introduces zero additional trajectory divergence during CUDA inference.
-3. **VRAM Scaling:** In 1024-token prompts on Grouped Query Attention (GQA) architectures, KV-cache represents a modest fraction of the 3.75 GB model weights; larger context windows ($4K \to 16K$) will highlight more substantial VRAM reduction as the KV cache scales linearly.
+### Rigorous Scientific Review & Limitations of GPU Validation
+1. **Context-Retention vs Throughput Trade-off (1.60x Speedup):**
+   - VANTAGE achieved **1.60× higher measured throughput** (11.93 tok/s vs 7.46 tok/s) compared to the full-context Hugging Face baseline.
+   - *Scientific Clarification:* This gain stems directly from reducing attention complexity from quadratic full attention ($O(N^2)$) to a bounded active window of $W=256$ ($O(N \cdot W)$). It represents an operational trade-off (trading distant context retention for constant-time decode complexity), not an equivalent-workload computational acceleration.
+2. **VRAM Composition & KV Cache Scale:**
+   - Peak allocated VRAM differed by only **5.68 MB** (3,755.74 MB vs 3,761.42 MB, a 0.15% difference).
+   - In a 1024-token prompt on Qwen2.5-3B (which uses Grouped Query Attention with 2 KV heads), model parameters and PyTorch workspace memory account for over 99% of total VRAM. This benchmark demonstrates that VANTAGE functions correctly on CUDA hardware without memory leaks, but does **not** claim substantial overall VRAM reduction at this prompt length.
+3. **Hardware Utilization Details:**
+   - Under `device_map="auto"`, the 3.75 GB model weights and attention states were accommodated entirely within **Device 0 (Tesla T4 #1)**. Device 1 remained idle as the model did not require pipeline tensor parallelism.
+   - Timings were synchronized using PyTorch CUDA synchronization barriers and verified with CUDA Events in benchmark script `benchmarks/kaggle_gpu_benchmark.py`.
+
 
 
