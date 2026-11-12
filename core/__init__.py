@@ -45,7 +45,7 @@ except ImportError:
     checkpoint_prompt_cache = None
     restore_prompt_cache = None
 
-__version__ = "8.0.0"
+__version__ = "8.1.0"
 
 __all__ = [
     "__version__",

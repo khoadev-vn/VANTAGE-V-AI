@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vantage-vai"
-version = "8.0.0"
+version = "8.1.0"
 description = "Experimental bounded-memory streaming engine, 2-bit packed ternary KV-cache, and hyperdimensional associative memory runtime for LLMs."
 readme = "README.md"
 license = { file = "LICENSE" }
