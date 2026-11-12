@@ -1,13 +1,13 @@
-# Vantage V-AI: A Bounded-Memory Adaptive Streaming Engine for Resource-Constrained Systems
+# Vantage V-AI: A Bounded-Memory Streaming Engine for Predictable Resource Usage
 
-[![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-16%20Passing-brightgreen.svg)](tests/test_engine.py)
+[![Tests](https://img.shields.io/badge/Tests-17%20Passing-brightgreen.svg)](tests/test_engine.py)
 
-**Vantage V-AI (v6.2)** is a **stateless, bounded-memory adaptive streaming engine** for resource-constrained data pipelines.
+**Vantage V-AI (v6.3.0)** is a **bounded-memory streaming engine designed for predictable resource usage under variable workloads**.
 
 > **Scientific Positioning:**
-> Vantage V-AI is **not** a new compression algorithm and **not** an LLM inference runtime. Its technical contribution is a **bounded-memory streaming architecture** (`process_iter`, `BoundedMemorySink`, `FileSink` with partial-write safety and length-prefixed framing) paired with opt-in **hysteresis-based adaptive chunking** (`AdaptiveStreamProcessor`). The measured process memory remained approximately constant (`22.52–25.13 MB` OS `Peak RSS`) as input size increased from `64 MiB` to `16 GiB`, under a fixed chunk size and bounded sink configuration.
+> Vantage V-AI is **not** a new compression algorithm and **not** an LLM inference runtime. Its contribution is a **bounded-memory streaming architecture** (`process_iter`, `BoundedMemorySink`, `FileSink` with partial-write safety and length-prefixed framing, `decompress_stream`) that keeps OS `Peak RSS` flat across `16 GiB` streams (`~23.8–27.7 MB`) and reduces End-to-End AI tokenization `Peak RSS` by **8.2x** (`65.16 MB` vs `534.28 MB`).
 
 ---
 
@@ -137,6 +137,33 @@ Measured on a **1 MiB slice** of `ai_corpus` (`1,048,576` bytes → `251,940` ac
 | `adversarial_jitter` | 5594.4 | **6208.1** | 1908.6 | 2029.5 | 1944.1 |
 
 > **Design Recommendation:** Because rapid entropy shifts (`alternating`, `adversarial_jitter`) penalize any `512 KiB` chunk that straddles incompressible bytes, `StatelessStreamProcessor(chunk_bytes=256 * 1024)` remains the **recommended default**, while `AdaptiveStreamProcessor(hysteresis_chunks=3)` is an opt-in policy for coarse-grained workloads.
+
+### 5. v6.3 Long-Duration RSS Time-Series, Quantile Ablation & End-to-End AI Pipeline ([`benchmarks/v63_repro_and_e2e.py`](benchmarks/v63_repro_and_e2e.py))
+
+#### A. 16 GiB Continuous RSS Time-Series (`BoundedMemorySink` 2 MiB cap, sampled every 1 GiB)
+- **RSS (MB) at 1..16 GiB:** `23.8, 25.6, 24.9, 27.6, 27.5, 27.3, 27.7, 26.8, 27.6, 27.3, 27.3, 26.9, 27.4, 27.6, 27.6, 26.5`
+- **Peak RSS:** Plateaus at **`27.7 MB`** from `5 GiB` through `16 GiB`.
+
+#### B. Adaptive Policy Ablation with `P25/P50/P75`, `StdDev` & `switch_count` (`16 MiB`, 15 trials)
+| Dataset | Policy | MB/s (P50) | P25 (ms) | P50 (ms) | P75 (ms) | Std (ms) | Switches |
+| :--- | :--- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `repeated` | `fixed_256k` | 8413.08 | 1.705 | 1.902 | 2.140 | 0.292 | 0 |
+| `repeated` | `adapt_h1` | **10145.20** | 1.505 | 1.577 | 1.988 | 0.333 | 0 |
+| `random` | `fixed_256k` | 4607.76 | 3.321 | 3.472 | 3.667 | 0.370 | 0 |
+| `random` | `adapt_h1` | **4906.02** | 3.154 | 3.261 | 3.522 | 0.269 | 0 |
+| `low_then_high` | `fixed_256k` | **4688.92** | 3.234 | 3.412 | 3.540 | 0.325 | 0 |
+| `low_then_high` | `adapt_h1` | 4209.97 | 3.532 | 3.801 | 4.313 | 0.578 | 1 |
+| `alternating` | `fixed_256k` | **2968.35** | 5.118 | 5.390 | 5.908 | 0.543 | 0 |
+| `alternating` | `adapt_h1` | 2479.97 | 5.962 | 6.452 | 6.871 | 0.553 | 15 |
+| `alternating` | `adapt_h3` | 2340.04 | 6.605 | 6.838 | 7.528 | 0.564 | 0 |
+
+#### C. End-to-End AI Preprocessing Pipeline (`16 MiB ai_corpus` → `tiktoken cl100k_base`)
+| Mode | File Size (MB) | Tokens | Time (ms) | Tokens/s | PyPeak (MB) | OS Peak RSS (MB) |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `full_ram_baseline` | 16.000 | 4,031,088 | 4468.18 | 902,176.8 | 135.068 | 534.28 |
+| `vantage_bounded_stream` | **1.233** | 4,031,149 | **4215.93** | **956,170.5** | **3.285** | **65.16** |
+
+Streaming decompressed `256 KiB` chunks lazily into `tiktoken` reduces **OS Peak RSS by 8.2x** (`65.16 MB` vs `534.28 MB`), **Python heap peak by 41.1x** (`3.285 MB` vs `135.068 MB`), and **disk footprint by 12.98x**, while running **5.6% faster end-to-end**. *(Note: chunk-boundary tokenization shifts token count by `+61` tokens / `0.0015%`; line-aligned framing can eliminate this if exact token boundaries are required.)*
 
 ---
 

@@ -18,6 +18,7 @@ from core.engine import (
     ParallelStreamProcessor,
     StatelessStreamProcessor,
     VantageEngine,
+    decompress_stream,
     read_framed_stream,
 )
 
@@ -231,3 +232,16 @@ def test_adaptive_dynamic_heterogeneous_streams():
             chunks = [payload[i : i + 100_000] for i in range(0, len(payload), 100_000)]
             istats = proc.process_iter(chunks, isink)
             assert proc.verify_roundtrip(isink.frames(), expected_crc32=istats.crc32) == payload
+            assert stats.switch_count >= 0
+
+
+def test_decompress_stream_lazy_roundtrip(tmp_path):
+    payload = b"LAZY_DECOMPRESS_STREAM_" * 20_000
+    proc = StatelessStreamProcessor(chunk_bytes=64 * 1024, codec=CodecType.LZ4_FRAME)
+    out_file = tmp_path / "lazy.vnt"
+    with out_file.open("wb") as f:
+        proc.process(payload, FileSink(f, framed=True))
+
+    with out_file.open("rb") as f:
+        restored = b"".join(decompress_stream(read_framed_stream(f), codec=CodecType.LZ4_FRAME))
+    assert restored == payload

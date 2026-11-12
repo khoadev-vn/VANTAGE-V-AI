@@ -1,7 +1,7 @@
-# Vantage V-AI v6.2 Technical Report: Memory Stress (16 GiB), Backpressure RSS & Adaptive Ablation
+# Vantage V-AI v6.3 Technical Report: Predictable Bounded-Memory Streaming & End-to-End AI Preprocessing
 
 **Author:** Nguyen Vo Anh Khoa  
-**Version:** 6.2.0 (Adaptive Policy & Memory Stress Testing)  
+**Version:** 6.3.0 (Public Release)  
 **Repository:** `khoadev-vn/VANTAGE-V-AI`  
 **Academic Reference:** *MLSysBook Vol. I* (`https://mlsysbook.ai/vol1/`)
 
@@ -71,6 +71,14 @@ Vantage V-AI v5.1 resolves these flaws with a strictly stateless streaming core 
 
 ---
 
-## 8. Next Phase: End-to-End Edge AI Integration
+## 8. v6.3 Long-Duration RSS Time-Series, Quantile Ablation & End-to-End AI Pipeline
+
+1. **16 GiB RSS Time-Series:** Sampling every `1 GiB` across a `16 GiB` continuous stream shows flat resident memory (`23.8–27.7 MB`, plateauing at `27.7 MB` from `5 GiB` to `16 GiB`).
+2. **Quantile Adaptive Ablation:** `adapt_h1` performs `15` chunk-size switches on `alternating` (`2479.97 MB/s`), whereas `adapt_h3` suppresses switching (`0` switches) yet still trails `fixed_256k` (`2968.35 MB/s`), confirming `fixed_256k` as the robust default.
+3. **End-to-End AI Preprocessing (`16 MiB ai_corpus` → `tiktoken cl100k_base`):** Lazy chunked decompression (`decompress_stream(read_framed_stream(f))`) reduces **OS Peak RSS by 8.2x** (`65.16 MB` vs `534.28 MB`), **Python heap peak by 41.1x** (`3.285 MB` vs `135.068 MB`), and **disk size by 12.98x** (`1.233 MB` vs `16.000 MB`), while achieving `956,170.5 tokens/s` (`4215.93 ms`) vs `902,176.8 tokens/s` (`4468.18 ms`) for the full-RAM baseline.
+
+---
+
+## 9. Next Phase: End-to-End Edge AI Inference Runtime Integration
 
 Following *MLSysBook Vol. I*, the next milestone is integrating Vantage's bounded-memory streaming layer with a real quantized edge inference runtime (e.g., `llama.cpp` or ONNX Runtime) to evaluate **TTFT**, **end-to-end tokens/s**, and **total Peak RSS** on identical prompts and model weights.

@@ -52,6 +52,7 @@ class StreamStats:
     output_bytes: int
     frames: int
     crc32: int
+    switch_count: int = 0
 
     @property
     def compression_ratio(self) -> float:
@@ -267,6 +268,15 @@ def decompress_chunk(frame: BufferLike, codec: CodecType = CodecType.LZ4_FRAME) 
     raise ValueError(f"Unsupported codec: {codec}")
 
 
+def decompress_stream(
+    frames: Iterable[BufferLike],
+    codec: CodecType = CodecType.LZ4_FRAME,
+) -> Iterator[bytes]:
+    """Lazily decompress a stream of frames one chunk at a time."""
+    for frame in frames:
+        yield decompress_chunk(frame, codec=codec)
+
+
 class StatelessStreamProcessor:
     """
     Strictly stateless streaming processor.
@@ -461,6 +471,7 @@ class AdaptiveStreamProcessor(StatelessStreamProcessor):
 
         current_chunk = self.select_chunk_bytes(view)
         streak = 0
+        switches = 0
         offset = 0
         out_bytes = 0
         frames = 0
@@ -481,13 +492,17 @@ class AdaptiveStreamProcessor(StatelessStreamProcessor):
             frames += 1
             offset += len(chunk)
             target = self._target_chunk_size(len(chunk), len(frame))
-            current_chunk, streak = self._update_hysteresis(current_chunk, target, streak)
+            next_chunk, streak = self._update_hysteresis(current_chunk, target, streak)
+            if next_chunk != current_chunk:
+                switches += 1
+            current_chunk = next_chunk
 
         return StreamStats(
             input_bytes=total_len,
             output_bytes=out_bytes,
             frames=frames,
             crc32=crc & 0xFFFFFFFF,
+            switch_count=switches,
         )
 
     def process_iter(self, chunks: Iterable[BufferLike], sink: OutputSink) -> StreamStats:
@@ -499,6 +514,7 @@ class AdaptiveStreamProcessor(StatelessStreamProcessor):
         buf = bytearray()
         current_chunk = self.high_entropy_chunk_bytes
         streak = 0
+        switches = 0
         initialized = False
 
         for item in chunks:
@@ -530,7 +546,10 @@ class AdaptiveStreamProcessor(StatelessStreamProcessor):
                 frames += 1
                 del buf[:current_chunk]
                 target = self._target_chunk_size(current_chunk, len(frame))
-                current_chunk, streak = self._update_hysteresis(current_chunk, target, streak)
+                next_chunk, streak = self._update_hysteresis(current_chunk, target, streak)
+                if next_chunk != current_chunk:
+                    switches += 1
+                current_chunk = next_chunk
 
         if len(buf) > 0:
             tail_view = memoryview(buf)
@@ -552,6 +571,7 @@ class AdaptiveStreamProcessor(StatelessStreamProcessor):
             output_bytes=total_out,
             frames=frames,
             crc32=crc & 0xFFFFFFFF,
+            switch_count=switches,
         )
 
 
