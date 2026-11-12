@@ -20,10 +20,11 @@ from core.engine import (
 from core.kv import (
     KVCacheMetadata,
     KVCacheStreamEngine,
-    KVStreamStats,
+    KVQuantizationError,
+    compute_quantization_error,
 )
 
-__version__ = "7.0.0"
+__version__ = "7.1.0"
 
 __all__ = [
     "__version__",
@@ -35,13 +36,14 @@ __all__ = [
     "FileSink",
     "KVCacheMetadata",
     "KVCacheStreamEngine",
-    "KVStreamStats",
+    "KVQuantizationError",
     "NullSink",
     "OutputSink",
     "ParallelStreamProcessor",
     "StatelessStreamProcessor",
     "StreamStats",
     "VantageEngine",
+    "compute_quantization_error",
     "decompress_stream",
     "iter_record_chunks",
     "read_framed_stream",

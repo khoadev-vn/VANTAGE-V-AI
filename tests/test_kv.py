@@ -9,7 +9,7 @@ import pytest
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from core.engine import CodecType
-from core.kv import KVCacheMetadata, KVCacheStreamEngine
+from core.kv import KVCacheMetadata, KVCacheStreamEngine, compute_quantization_error
 
 try:
     import torch
@@ -93,3 +93,9 @@ def test_torch_kv_cache_fp8_quantized_stream_offload():
     # Verify bounded numerical error from FP8 quantization (cosine similarity > 0.999)
     cos_sim = torch.nn.functional.cosine_similarity(k.flatten().float(), k_rel.flatten().float(), dim=0)
     assert cos_sim.item() > 0.999
+
+    err = compute_quantization_error(k, k_rel)
+    assert err.mean_absolute_error < 0.02
+    assert err.root_mean_squared_error < 0.03
+    assert err.relative_error < 0.03
+    assert err.cosine_similarity > 0.999

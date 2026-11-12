@@ -24,7 +24,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO_ROOT))
 
 from core.engine import CodecType
-from core.kv import KVCacheStreamEngine
+from core.kv import KVCacheStreamEngine, compute_quantization_error
 
 
 def benchmark_llama3_kv_cache(tokens: int = 4096, num_layers: int = 8) -> dict:
@@ -88,16 +88,20 @@ def benchmark_llama3_kv_cache(tokens: int = 4096, num_layers: int = 8) -> dict:
         assert torch.equal(kv_cache[layer][0], reloaded[layer][0])
         assert torch.equal(kv_cache[layer][1], reloaded[layer][1])
 
-    # 4. FP8 Quality Check (Cosine Similarity across all layers)
+    # 4. Rigorous Quantization Error Profiling (MAE, RMSE, Max Error, Rel Error, Cosine)
     stream_fp8 = io.BytesIO()
     engine.stream_offload_cache(kv_cache, stream_fp8, quantize_fp8=True)
     stream_fp8.seek(0)
     reloaded_fp8 = engine.stream_reload_cache(stream_fp8, as_torch=True)
-    cos_sims = [
-        torch.nn.functional.cosine_similarity(kv_cache[l][0].flatten().float(), reloaded_fp8[l][0].flatten().float(), dim=0).item()
+    layer_errors = [
+        compute_quantization_error(kv_cache[l][0], reloaded_fp8[l][0])
         for l in range(num_layers)
     ]
-    min_cos_sim = min(cos_sims)
+    max_abs_err = max(e.max_absolute_error for e in layer_errors)
+    avg_mae = statistics.mean(e.mean_absolute_error for e in layer_errors)
+    avg_rmse = statistics.mean(e.root_mean_squared_error for e in layer_errors)
+    avg_rel_err = statistics.mean(e.relative_error for e in layer_errors)
+    min_cos_sim = min(e.cosine_similarity for e in layer_errors)
 
     # 5. Baseline: PyTorch torch.save()
     save_stream = io.BytesIO()
@@ -116,14 +120,20 @@ def benchmark_llama3_kv_cache(tokens: int = 4096, num_layers: int = 8) -> dict:
         "fp8_compressed_mb": round(fp8_bytes / (1024 * 1024), 2),
         "fp8_compression_ratio": round(fp8_ratio, 2),
         "fp8_offload_ms": round(med_fp8_offload * 1000, 2),
-        "fp8_min_cosine_similarity": round(min_cos_sim, 5),
+        "error_metrics": {
+            "max_absolute_error": round(max_abs_err, 6),
+            "mean_absolute_error": round(avg_mae, 6),
+            "root_mean_squared_error": round(avg_rmse, 6),
+            "mean_relative_error": round(avg_rel_err, 6),
+            "min_cosine_similarity": round(min_cos_sim, 6),
+        },
         "lossless_offload_ms": round(med_offload * 1000, 2),
         "lossless_reload_ms": round(med_reload * 1000, 2),
         "torch_save_ms": round(med_torch_save * 1000, 2),
         "bit_for_bit_lossless": True,
     }
     print(f"  FP8 Offload: {result['fp8_offload_ms']} ms | Memory: {result['raw_mb']} MB -> {result['fp8_compressed_mb']} MB ({result['fp8_compression_ratio']}x reduction)")
-    print(f"  FP8 Numerical Quality: Cosine Similarity = {result['fp8_min_cosine_similarity']}")
+    print(f"  Error Metrics: MAE={result['error_metrics']['mean_absolute_error']} | RMSE={result['error_metrics']['root_mean_squared_error']} | RelErr={result['error_metrics']['mean_relative_error']} | CosSim={result['error_metrics']['min_cosine_similarity']}")
     print(f"  Lossless Offload: {result['lossless_offload_ms']} ms | Reload: {result['lossless_reload_ms']} ms")
     return result
 

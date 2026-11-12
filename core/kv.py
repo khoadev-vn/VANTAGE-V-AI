@@ -64,15 +64,54 @@ class KVCacheMetadata:
 
 
 @dataclass(frozen=True)
-class KVStreamStats:
-    """Metrics for KV-Cache compression & offloading."""
+class KVQuantizationError:
+    """Rigorous error metrics between original FP16 and restored FP8 tensors."""
 
-    total_tokens: int
-    raw_bytes: int
-    compressed_bytes: int
-    compression_ratio: float
-    offload_time_ms: float
-    throughput_gb_s: float
+    max_absolute_error: float
+    mean_absolute_error: float
+    root_mean_squared_error: float
+    relative_error: float
+    cosine_similarity: float
+
+
+def compute_quantization_error(
+    original: Union["torch.Tensor", np.ndarray],
+    restored: Union["torch.Tensor", np.ndarray],
+) -> KVQuantizationError:
+    """Compute MAE, RMSE, Max Error, Relative Error, and Cosine Similarity."""
+    if torch is not None and isinstance(original, torch.Tensor) and isinstance(restored, torch.Tensor):
+        orig_f = original.detach().cpu().to(torch.float32).flatten()
+        rest_f = restored.detach().cpu().to(torch.float32).flatten()
+        diff = (orig_f - rest_f).abs()
+        max_err = float(diff.max())
+        mae = float(diff.mean())
+        rmse = float(torch.sqrt((diff ** 2).mean()))
+        rel_err = float(diff.mean() / (orig_f.abs().mean() + 1e-8))
+        cos = float(torch.nn.functional.cosine_similarity(orig_f, rest_f, dim=0))
+        return KVQuantizationError(
+            max_absolute_error=round(max_err, 6),
+            mean_absolute_error=round(mae, 6),
+            root_mean_squared_error=round(rmse, 6),
+            relative_error=round(rel_err, 6),
+            cosine_similarity=round(cos, 6),
+        )
+
+    orig_np = np.asarray(original, dtype=np.float32).flatten()
+    rest_np = np.asarray(restored, dtype=np.float32).flatten()
+    diff = np.abs(orig_np - rest_np)
+    max_err = float(np.max(diff))
+    mae = float(np.mean(diff))
+    rmse = float(np.sqrt(np.mean(diff ** 2)))
+    rel_err = float(np.mean(diff) / (np.mean(np.abs(orig_np)) + 1e-8))
+    norm_prod = np.linalg.norm(orig_np) * np.linalg.norm(rest_np) + 1e-8
+    cos = float(np.dot(orig_np, rest_np) / norm_prod)
+    return KVQuantizationError(
+        max_absolute_error=round(max_err, 6),
+        mean_absolute_error=round(mae, 6),
+        root_mean_squared_error=round(rmse, 6),
+        relative_error=round(rel_err, 6),
+        cosine_similarity=round(cos, 6),
+    )
 
 
 class KVCacheStreamEngine:

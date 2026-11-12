@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-26%20Passing%20(Local)-brightgreen.svg)](tests/)
 
-**Vantage V-AI (v7.0.0)** is a **bounded-memory streaming and Attention KV-Cache compression engine** designed for LLM inference runtimes (vLLM, HuggingFace, llama.cpp, coding agents).
+**Vantage V-AI (v7.1.0)** is a **bounded-memory streaming and Attention KV-Cache compression engine** designed for LLM inference runtimes (vLLM, HuggingFace, llama.cpp, coding agents).
 
 > **Scientific Positioning:**
 > Vantage V-AI solves memory pressure in AI pipelines across two critical layers:
@@ -178,18 +178,18 @@ Using [`iter_record_chunks`](core/engine.py) to align decompressed `256 KiB` chu
 - **Timing Trade-off & Token Parity Scope:** On the `16 MiB` isolated run, Vantage took `4223.63 ms` vs `3767.14 ms` for the full-RAM baseline due to LZ4 decompression and per-chunk `tiktoken` invocation overhead—Vantage trades ~12% runtime for an 8.06x memory reduction, not a universal speed gain. Exact token-ID parity via `iter_record_chunks(..., delimiter=b"\n")` applies to **line-delimited / record-delimited text**; continuous prose where a BPE token spans across `\n` or arbitrary binary payloads are outside its parity scope.
 - *Note on CI:* GitHub Actions CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) is configured for `ubuntu-latest` and `windows-latest` (Python `3.10–3.12`); local `pytest` (`21/21`) and `examples/quickstart.py` passed on Windows 11 / Python 3.12.10.
 
-### 6. v7.0.0 Attention KV-Cache Streaming & Compression ([`core/kv.py`](core/kv.py), [`benchmarks/bench_kv_cache.py`](benchmarks/bench_kv_cache.py))
+### 6. v7.1.0 Attention KV-Cache Streaming & Error Profiling ([`core/kv.py`](core/kv.py), [`benchmarks/bench_kv_cache.py`](benchmarks/bench_kv_cache.py))
 
 Designed for long-context inference offloading (e.g. vLLM / HuggingFace Transformers) to solve KV-cache VRAM/RAM exhaustion during autoregressive decoding.
 
 **Llama-3-8B Attention KV-Cache Benchmark (8 Layers, 8 Heads, 128 Head Dim, FP16):**
-| Context Length | Raw Volume | FP8 Offloaded | Memory Reduction | FP8 Cosine Similarity | Lossless Round-Trip |
-| :--- | ---: | ---: | ---: | ---: | :---: |
-| **4,096 Tokens** | 128.00 MB | 64.25 MB | **1.99x (50.0%)** | **1.0000** | **100% BIT-FOR-BIT IDENTICAL** |
-| **8,192 Tokens** | 256.00 MB | 128.50 MB | **1.99x (50.0%)** | **1.0000** | **100% BIT-FOR-BIT IDENTICAL** |
+| Context Length | Raw Volume | FP8 Volume | Memory Reduction | MAE | RMSE | Relative Error | Cosine Sim | Lossless Round-Trip |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | :---: |
+| **4,096 Tokens** | 128.00 MB | 64.25 MB | **1.99x (49.8%)** | **0.00768** | **0.00888** | **0.00963 (<1%)** | **1.0000** | **100% BIT-FOR-BIT IDENTICAL** |
+| **8,192 Tokens** | 256.00 MB | 128.50 MB | **1.99x (49.8%)** | **0.00768** | **0.00888** | **0.00964 (<1%)** | **1.0000** | **100% BIT-FOR-BIT IDENTICAL** |
 
 - **Lossless Mode:** Stream offload + reload preserves exact bit-level tensor values with zero numerical drift (`torch.equal(k, k_reloaded) == True`).
-- **Dynamic FP8 Quantization Mode:** Reduces attention memory by 50% with near-zero precision loss (cosine similarity `> 0.9999`), enabling 2x longer context windows under fixed GPU/host memory budgets.
+- **Dynamic FP8 Quantization Mode:** Cuts raw tensor footprint by ~49.8% (accounting for scale metadata) with **MAE < 0.0077** and **relative error < 0.97%**, providing an empirical error bound before full-model end-to-end inference integration. *(Note: Evaluated on 8-layer slice tensors; full-model perplexity and GPU-VRAM transfer benchmarks are planned for v7.2).*
 
 ---
 

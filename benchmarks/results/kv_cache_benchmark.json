@@ -5,11 +5,17 @@
     "raw_mb": 128.0,
     "fp8_compressed_mb": 64.25,
     "fp8_compression_ratio": 1.99,
-    "fp8_offload_ms": 1161.76,
-    "fp8_min_cosine_similarity": 1.00028,
-    "lossless_offload_ms": 758.66,
-    "lossless_reload_ms": 363.61,
-    "torch_save_ms": 159.57,
+    "fp8_offload_ms": 1283.88,
+    "error_metrics": {
+      "max_absolute_error": 0.015625,
+      "mean_absolute_error": 0.00768,
+      "root_mean_squared_error": 0.008875,
+      "mean_relative_error": 0.009633,
+      "min_cosine_similarity": 1.000278
+    },
+    "lossless_offload_ms": 688.52,
+    "lossless_reload_ms": 300.46,
+    "torch_save_ms": 120.29,
     "bit_for_bit_lossless": true
   },
   "llama3_8k": {
@@ -18,11 +24,17 @@
     "raw_mb": 256.0,
     "fp8_compressed_mb": 128.5,
     "fp8_compression_ratio": 1.99,
-    "fp8_offload_ms": 2154.19,
-    "fp8_min_cosine_similarity": 1.00048,
-    "lossless_offload_ms": 1600.24,
-    "lossless_reload_ms": 984.41,
-    "torch_save_ms": 422.92,
+    "fp8_offload_ms": 2461.63,
+    "error_metrics": {
+      "max_absolute_error": 0.015625,
+      "mean_absolute_error": 0.00768,
+      "root_mean_squared_error": 0.008875,
+      "mean_relative_error": 0.009635,
+      "min_cosine_similarity": 1.000477
+    },
+    "lossless_offload_ms": 1611.6,
+    "lossless_reload_ms": 616.68,
+    "torch_save_ms": 255.71,
     "bit_for_bit_lossless": true
   }
 }
