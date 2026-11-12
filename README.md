@@ -4,10 +4,10 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-11%20Passing-brightgreen.svg)](tests/test_engine.py)
 
-**Vantage V-AI (v5.1)** is a research prototype for **stateless, bounded-memory streaming data processing and compression** in resource-constrained AI/edge pipelines.
+**Vantage V-AI (v5.2)** is a research prototype for **stateless, bounded-memory streaming data processing and compression** in resource-constrained AI/edge pipelines.
 
 > **Scientific Positioning:**
-> Vantage V-AI is a **data processing and streaming compression layer**, not an LLM inference runtime. Earlier v4.0 claims (`4.3B tokens/s`, `<2MB RAM`) were retracted. Version 5.1 establishes codec-parity baselines, 30-trial statistical dispersion (`IQR`, `StdDev`, `P95`, `P99`), isolated-subprocess `Peak RSS` profiling, mandatory `CRC32` + round-trip verification, and a separate real BPE tokenization baseline.
+> Vantage V-AI is a **data processing and streaming compression layer**, not an LLM inference runtime. Earlier v4.0 claims (`4.3B tokens/s`, `<2MB RAM`) were retracted. Version 5.2 adds **root-cause validation** (chunking parity, chunk-size sweep from `64 KiB` to `8 MiB`, and `CRC32` cost isolation) on top of v5.1's codec-parity benchmarks and isolated-subprocess `Peak RSS` profiling.
 
 ---
 
@@ -67,7 +67,10 @@ Raw trial data: [`benchmarks/results/benchmark_results.csv`](benchmarks/results/
 | `random` | `vantage_lz4_block_1t` | 1185.76 | 6.747 | 0.650 | 0.699 | 8.432 | 8.816 | 1.00x | **0.754** |
 | `random` | `vantage_lz4_block_raw` | **2601.75** | **3.075** | 1.189 | 0.904 | 4.864 | 5.116 | 1.00x | **0.754** |
 
-**Root-Cause Finding:** Under exact codec parity (`lz4.block.compress`, no CRC32), `256 KiB` `memoryview` chunking (`vantage_lz4_block_raw`) is **2.1x–4.6x faster** than one-shot 8 MiB `python_lz4_block_naive` (`6180` vs `1328 MB/s` on `repeated`; `2601` vs `728 MB/s` on `random`) and reduces Python peak heap allocation by **10x–31x** (`0.25–0.75 MB` vs `8.0–16.0 MB`).
+**Root-Cause Validation (v5.2, [`benchmarks/v52_root_cause.py`](benchmarks/v52_root_cause.py)):**
+1. **Chunking Parity:** Plain Python `memoryview` + `256 KiB` `lz4.block.compress` (`python_lz4_block_chunked`) matches `vantage_lz4_block_raw` (`1494–7754 MB/s` vs `1636–6816 MB/s`, identical `0.254–0.754 MB` `PyPeak`). Thus, the throughput and heap-allocation gains come from the **chunking strategy**, while Vantage's contribution is packaging it into a stateless, bounded-sink streaming architecture.
+2. **Chunk-Size Sweep (`64 KiB`–`8 MiB`):** On `random`, throughput peaks at **`256 KiB` (`3915.6 MB/s`)** and drops sharply at **`512 KiB` (`917.9 MB/s`)**. Slicing data into `256 KiB` chunks via `memoryview` reduces the processing unit size and limits concurrent transient allocations; cache-locality effects require hardware counter profiling to confirm.
+3. **CRC32 Cost Isolation:** `crc32_only` runs at `1356–1658 MB/s` (`4.8–5.9 ms`), whereas `compress_only` runs at `1613–5661 MB/s` (`1.4–5.0 ms`), confirming that `zlib.crc32` accounts for ~50–80% of runtime when integrity checks are enabled.
 
 ### 2. Isolated Subprocess Full-Lifecycle Peak RSS (`8 MiB random`)
 

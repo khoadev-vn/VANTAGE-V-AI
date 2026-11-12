@@ -1,7 +1,7 @@
-# Vantage V-AI v5.1 Technical Report: Stateless Streaming & Memory-Bounded Processing
+# Vantage V-AI v5.2 Technical Report: Stateless Streaming & Root-Cause Validation
 
 **Author:** Nguyen Vo Anh Khoa  
-**Version:** 5.1 (Codec-Parity & Isolated Memory Baseline)  
+**Version:** 5.2 (Root-Cause Validation)  
 **Repository:** `khoadev-vn/VANTAGE-V-AI`  
 **Academic Reference:** *MLSysBook Vol. I* (`https://mlsysbook.ai/vol1/`)
 
@@ -39,6 +39,14 @@ Vantage V-AI v5.1 resolves these flaws with a strictly stateless streaming core 
 
 ---
 
-## 4. Next Phase: End-to-End Edge AI Integration
+## 4. v5.2 Root-Cause Experiments (15 Trials, 8 MiB/Dataset)
+
+1. **Chunking Parity (`python_lz4_block_chunked` vs `vantage_lz4_block_raw`):** Both use `memoryview` `256 KiB` slices + `lz4.block.compress` without CRC32 and achieve comparable throughput (`7754` vs `6816 MB/s` on `repeated`; `1494` vs `1636 MB/s` on `json_records`; `2267` vs `2064 MB/s` on `ai_corpus`; `2220` vs `2799 MB/s` on `random`) and identical `PyPeak` (`0.254–0.754 MB`). This confirms the speedup stems from the chunking strategy rather than a novel compression algorithm.
+2. **Chunk-Size Sweep (`64 KiB`–`8 MiB`):** On `random`, throughput peaks at `256 KiB` (`3915.6 MB/s`) before dropping to `917.9 MB/s` at `512 KiB`. Slicing data into `256 KiB` chunks via `memoryview` reduces processing unit size and limits concurrent transient allocations; hardware counter profiling is needed to confirm cache-locality effects.
+3. **CRC32 Cost Isolation:** `crc32_only` (`1356–1658 MB/s`) vs `compress_only` (`1613–5661 MB/s`) vs `compress_plus_crc32` (`735–1327 MB/s`) directly isolates checksum overhead.
+
+---
+
+## 5. Next Phase: End-to-End Edge AI Integration
 
 Following *MLSysBook Vol. I*, the next milestone is integrating Vantage's bounded-memory streaming layer with a real quantized edge inference runtime (e.g., `llama.cpp` or ONNX Runtime) to evaluate **TTFT**, **end-to-end tokens/s**, and **total Peak RSS** on identical prompts and model weights.

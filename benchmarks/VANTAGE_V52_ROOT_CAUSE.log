@@ -1,0 +1,39 @@
+========================================================================================
+VANTAGE V-AI v5.2 — ROOT-CAUSE VALIDATION LOG (15 trials, 8 MiB/dataset)
+========================================================================================
+EXPERIMENT 1: CHUNKING PARITY (256 KiB memoryview + lz4.block, no CRC32)
+Dataset       Implementation              MB/s(P50)   P50(ms)   IQR(ms)  PyPeak(MB)
+----------------------------------------------------------------------------------------
+repeated      python_lz4_block_chunked      7754.16     1.032     0.418       0.254
+repeated      vantage_lz4_block_raw         6816.61     1.174     0.405       0.254
+json_records  python_lz4_block_chunked      1494.52     5.353     1.290       0.325
+json_records  vantage_lz4_block_raw         1636.53     4.889     0.380       0.325
+ai_corpus     python_lz4_block_chunked      2267.26     3.529     0.754       0.291
+ai_corpus     vantage_lz4_block_raw         2064.21     3.876     0.652       0.291
+random        python_lz4_block_chunked      2220.19     3.603     1.950       0.754
+random        vantage_lz4_block_raw         2799.55     2.858     0.909       0.754
+----------------------------------------------------------------------------------------
+EXPERIMENT 2: CHUNK-SIZE SWEEP (MB/s P50, lz4.block, no CRC32)
+Dataset            64K     128K     256K     512K    1024K    2048K    8192K
+----------------------------------------------------------------------------------------
+repeated        3234.4   4875.9   6362.8   6394.9   3145.6   6413.8   4331.1
+json_records    1274.4   1295.7   1529.7   1464.5   1354.8   1341.6   1405.3
+ai_corpus       2080.5   2486.9   2588.2   2872.1   2326.7   2595.6   2353.7
+random          2195.8   3097.8   3915.6    917.9   1109.7   1179.4   1161.8
+----------------------------------------------------------------------------------------
+EXPERIMENT 3: CRC32 COST ISOLATION (256 KiB chunks)
+Dataset       Mode                    MB/s(P50)   P50(ms)   IQR(ms)
+----------------------------------------------------------------------------------------
+repeated      crc32_only                1645.31     4.862     0.432
+repeated      compress_only             5661.29     1.413     0.556
+repeated      compress_plus_crc32       1327.36     6.027     0.358
+json_records  crc32_only                1544.70     5.179     0.402
+json_records  compress_only             1613.78     4.957     0.528
+json_records  compress_plus_crc32        735.45    10.878     1.649
+ai_corpus     crc32_only                1356.56     5.897     0.702
+ai_corpus     compress_only             2185.68     3.660     1.078
+ai_corpus     compress_plus_crc32       1033.50     7.741     0.337
+random        crc32_only                1658.58     4.823     0.146
+random        compress_only             3291.77     2.430     0.651
+random        compress_plus_crc32       1106.12     7.233     0.992
+========================================================================================
