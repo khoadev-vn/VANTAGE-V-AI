@@ -271,3 +271,72 @@ def test_iter_record_chunks_exact_token_parity(tmp_path):
             stream_tokens.extend(enc.encode(aligned.decode("utf-8")))
 
     assert stream_tokens == full_tokens
+
+
+def test_utf8_multibyte_split_across_chunks(tmp_path):
+    tiktoken = pytest.importorskip("tiktoken")
+    enc = tiktoken.get_encoding("cl100k_base")
+
+    # Multibyte UTF-8 (Vietnamese + emoji + CJK) forced across tiny 1 KiB chunk boundaries
+    line = "Xin chào Vantage 🚀 日本語テスト — streaming bounded memory.\n".encode("utf-8")
+    payload = line * 300
+    full_tokens = enc.encode(payload.decode("utf-8"))
+
+    proc = StatelessStreamProcessor(chunk_bytes=1024, codec=CodecType.LZ4_BLOCK)
+    out_file = tmp_path / "utf8.vnt"
+    with out_file.open("wb") as f:
+        proc.process(payload, FileSink(f, framed=True))
+
+    stream_tokens = []
+    with out_file.open("rb") as f:
+        decompressed = decompress_stream(read_framed_stream(f), codec=CodecType.LZ4_BLOCK)
+        for aligned in iter_record_chunks(decompressed, delimiter=b"\n"):
+            stream_tokens.extend(enc.encode(aligned.decode("utf-8")))
+
+    assert stream_tokens == full_tokens
+
+
+def test_crlf_and_no_trailing_newline_token_parity(tmp_path):
+    tiktoken = pytest.importorskip("tiktoken")
+    enc = tiktoken.get_encoding("cl100k_base")
+
+    payload = (
+        b"line one with crlf\r\n" * 500
+        + b"line two with lf\n" * 500
+        + b"final line without trailing newline"
+    )
+    full_tokens = enc.encode(payload.decode("utf-8"))
+
+    proc = StatelessStreamProcessor(chunk_bytes=2048, codec=CodecType.LZ4_FRAME)
+    out_file = tmp_path / "crlf.vnt"
+    with out_file.open("wb") as f:
+        proc.process(payload, FileSink(f, framed=True))
+
+    stream_tokens = []
+    with out_file.open("rb") as f:
+        decompressed = decompress_stream(read_framed_stream(f), codec=CodecType.LZ4_FRAME)
+        for aligned in iter_record_chunks(decompressed, delimiter=b"\n"):
+            stream_tokens.extend(enc.encode(aligned.decode("utf-8")))
+
+    assert stream_tokens == full_tokens
+
+
+def test_corrupted_and_truncated_frames_raise():
+    import io
+    import struct
+
+    # Truncated header (< 4 bytes)
+    with pytest.raises(EOFError):
+        list(read_framed_stream(io.BytesIO(b"\x01\x02")))
+
+    # Truncated payload (header claims 100 bytes, stream has 3)
+    bad_payload = struct.pack("<I", 100) + b"abc"
+    with pytest.raises(EOFError):
+        list(read_framed_stream(io.BytesIO(bad_payload)))
+
+    # CRC32 mismatch on verify_roundtrip
+    proc = StatelessStreamProcessor(codec=CodecType.LZ4_FRAME, compute_checksum=True)
+    sink = CollectingSink()
+    proc.process(b"integrity test payload", sink)
+    with pytest.raises(ValueError, match="CRC32 mismatch"):
+        proc.verify_roundtrip(sink.frames(), expected_crc32=0xDEADBEEF)

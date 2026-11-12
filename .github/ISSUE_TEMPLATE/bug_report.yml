@@ -1,0 +1,22 @@
+name: Bug report
+description: Create a report to help us improve Vantage V-AI
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report an issue!
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Also tell us what you expected to happen.
+    validations:
+      required: true
+  - type: input
+    id: os-python
+    attributes:
+      label: Environment
+      description: OS, CPU, RAM, and Python version (e.g., Windows 11, Intel 6C/12T, Python 3.12.10)
+    validations:
+      required: true

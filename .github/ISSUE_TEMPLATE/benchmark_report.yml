@@ -1,0 +1,18 @@
+name: Benchmark reproduction report
+description: Share benchmark reproduction results from your hardware
+labels: ["benchmark", "reproducibility"]
+body:
+  - type: textarea
+    id: hardware
+    attributes:
+      label: Hardware & Environment
+      description: CPU, RAM, OS, Python version, package versions.
+    validations:
+      required: true
+  - type: textarea
+    id: results
+    attributes:
+      label: Benchmark Output
+      description: Paste the output of python benchmarks/vantage_validation.py or benchmarks/v64_e2e_token_parity.py.
+    validations:
+      required: true

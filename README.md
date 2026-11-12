@@ -2,9 +2,9 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-18%20Passing%20(Local)-brightgreen.svg)](tests/test_engine.py)
+[![Tests](https://img.shields.io/badge/Tests-21%20Passing%20(Local)-brightgreen.svg)](tests/test_engine.py)
 
-**Vantage V-AI (v6.4.0)** is a **bounded-memory streaming engine designed for predictable resource usage under variable workloads**.
+**Vantage V-AI (v6.4.1)** is a **bounded-memory streaming engine designed for predictable resource usage under variable workloads**.
 
 > **Scientific Positioning:**
 > Vantage V-AI is **not** a new compression algorithm and **not** an LLM inference runtime. Its contribution is a **bounded-memory streaming architecture** (`process_iter`, `BoundedMemorySink`, `FileSink`, `decompress_stream`, `iter_record_chunks`). During a `16 GiB` streaming run, sampled process RSS remained within `23.8–27.7 MB`, with no observable growth proportional to the amount of data processed. In End-to-End `tiktoken` preprocessing (`16 MiB ai_corpus`), Vantage achieves **100% bit-for-bit token ID parity** (`4,031,088 == 4,031,088` tokens) while reducing **OS Peak RSS by 8.06x** (`66.27 MB` vs `534.37 MB`) and **Python heap peak by 35.7x** (`3.786 MB` vs `135.067 MB`).
@@ -173,7 +173,8 @@ Using [`iter_record_chunks`](core/engine.py) to align decompressed `256 KiB` chu
 | `vantage_aligned_stream` | **1.233** | **4,031,088** | 4223.63 | **3.786** | **66.27** |
 
 - **8.06x lower OS Peak RSS** (`66.27 MB` vs `534.37 MB`) and **35.7x lower Python heap peak** (`3.786 MB` vs `135.067 MB`) with **0-token discrepancy**.
-- *Note on CI:* GitHub Actions CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) is configured for `ubuntu-latest` and `windows-latest` (Python `3.10–3.12`); local `pytest` (`18/18`) and `examples/quickstart.py` passed on Windows 11 / Python 3.12.10.
+- **Timing Trade-off & Token Parity Scope:** On the `16 MiB` isolated run, Vantage took `4223.63 ms` vs `3767.14 ms` for the full-RAM baseline due to LZ4 decompression and per-chunk `tiktoken` invocation overhead—Vantage trades ~12% runtime for an 8.06x memory reduction, not a universal speed gain. Exact token-ID parity via `iter_record_chunks(..., delimiter=b"\n")` applies to **line-delimited / record-delimited text**; continuous prose where a BPE token spans across `\n` or arbitrary binary payloads are outside its parity scope.
+- *Note on CI:* GitHub Actions CI ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)) is configured for `ubuntu-latest` and `windows-latest` (Python `3.10–3.12`); local `pytest` (`21/21`) and `examples/quickstart.py` passed on Windows 11 / Python 3.12.10.
 
 ---
 

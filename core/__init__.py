@@ -18,7 +18,7 @@ from core.engine import (
     read_framed_stream,
 )
 
-__version__ = "6.4.0"
+__version__ = "6.4.1"
 
 __all__ = [
     "__version__",
