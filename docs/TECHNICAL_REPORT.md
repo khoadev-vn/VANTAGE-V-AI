@@ -123,44 +123,36 @@ Vantage V-AI v5.1 resolves these flaws with a strictly stateless streaming core 
 
 ---
 
-## 12. v8.0.0 Frontier SOTA Architecture: BitNet 1.58-bit Ternary, Attention Sinks & HDC Associative Memory
+## 12. v8.0.0 Architecture: 2-Bit Packed Ternary, Streaming Attention Sinks & HDC Associative Memory
 
-Vantage V-AI v8.0.0 elevates the system from an offloaded cache prototype to a complete frontier cognitive runtime memory architecture, addressing the critical limitations discovered in prior versions:
+Vantage V-AI v8.0.0 expands the runtime into three complementary experimental directions:
 
-### 1. BitNet b1.58 Ternary Quantization (`QUANT_TERNARY_158`)
-- **Mathematical Principle:** Following the BitNet b1.58 paradigm, continuous multi-head attention activation values are mapped into ternary states $\{-1, 0, +1\}$ scaled by the per-tensor mean absolute magnitude $\gamma = \frac{1}{N} \sum |X_i|$:
-  $$\tilde{X} = \text{Clip}\left(\text{Round}\left(\frac{X}{\gamma}\right), -1, +1\right)$$
-- **Vectorized 2-Bit SIMD Packing:** 4 ternary elements are bit-shifted into a single `uint8` byte ($2 \text{ bits/element}$).
-- **Empirical Results (Pretrained GPT-2 & Multi-Layer Attention):**
-  - **7.97x memory reduction** over FP16 (16.0x over FP32): 6.14 MB context compressed down to **789 KB**.
-  - **High Directional Fidelity:** Cosine similarity = **0.887** with well-behaved bounded absolute error, matching theoretical 1.58-bit loss surfaces.
-  - Encoding throughput: **112–148 MB/s**; Decoding throughput: **110–148 MB/s**.
+### 1. 2-Bit Packed Ternary Representation (Inspired by BitNet b1.58)
+- **Entropy vs Practical Representation:** While a ternary alphabet $\{-1, 0, +1\}$ possesses an information-theoretic lower bound of $\log_2 3 \approx 1.585 \text{ bits/element}$ (yielding a theoretical $16 / 1.585 \approx 10.1\times$ reduction vs FP16), practical byte-aligned hardware packing requires 2 bits per element (4 elements packed per `uint8` byte via `pack_ternary_2bit`).
+- **Compression Limit:** The realistic maximum compression ratio for this 2-bit representation against FP16 is $16 / 2 = 8.0\times$. In empirical benchmarks on multi-layer attention tensors, Vantage achieves **7.97x storage reduction** (99.6% of the 8.0x theoretical ceiling).
+- **Error Characteristics:**
+  - Cosine Similarity: **0.887**
+  - Mean Absolute Error (MAE): **0.357**
+  - Encoding Throughput: **101–148 MB/s**; Decoding Throughput: **102–148 MB/s**
 
-### 2. Attention Sinks (`sink_tokens=4`) & The End of Attention Collapse
-- **Root Cause of Sliding Window Divergence:** In pure sliding-window attention (without sinks), truncating the initial prompt evicts the *attention sinks* (the first 1–4 tokens where attention heads anchor high softmax scores). As observed in v7.3.2, this triggered immediate trajectory divergence (1/64 tokens match) and generated repetitive degenerative loops (e.g., `" storage storage storage..."`).
-- **Attention Sink Preservation Mechanism:** `VantageStreamingCache` reserves initial positions $[0 : \text{sink\_tokens}]$ permanently in active attention memory, sliding only the intermediate window.
-- **Empirical Validation (Pretrained GPT-2, 512-token prompt, 64 generated tokens):**
-  - **Repetitive Loop Completely Eliminated:** The model terminated cleanly with coherent natural language (`" of resources.<|endoftext|>"`).
-  - **5.48x E2E Inference Speedup:** **77.95 ± 3.86 tok/s** vs **14.23 ± 0.43 tok/s** for Hugging Face `DynamicCache` baseline!
-  - **Lossless vs FP8 Parity:** Under attention sink streaming, both Lossless LZ4 and Dynamic FP8 produced the **exact same token sequence**, confirming zero semantic degradation while cutting offload footprint by 4x (2.31 MB vs 9.25 MB).
+### 2. Streaming Attention Sinks (Inspired by StreamingLLM)
+- **Mechanism:** In accordance with StreamingLLM findings (Xiao et al., 2023), initial tokens in autoregressive Transformers absorb excessive attention softmax mass. In pure sliding-window attention without sinks, evicting the prompt prefix causes immediate trajectory divergence and degenerative repetition loops (as observed in v7.3.2 with `storage storage storage...`).
+- **Runtime Offloading Integration:** `VantageStreamingCache` reserves initial token positions $[0 : \text{sink\_tokens}]$ permanently in active attention memory, evicting only intermediate tokens into block-level offloaded storage (`block_size=32`).
+- **Throughput & Context-Trade-off Clarification:**
+  - On a 512-token prompt using pretrained `gpt2` on CPU, `VantageStreamingCache` ($W=256$, `sink_tokens=4`) achieved **77.95 ± 3.86 tok/s** compared to **14.23 ± 0.43 tok/s** for full-attention `DynamicCache`.
+  - *Critical Assessment:* This 5.48x throughput difference is an expected consequence of reducing the attention complexity from $O(N^2)$ to $O(N \cdot W)$ by discarding distant context. It demonstrates the operational efficiency of the bounded streaming window under the tested setup, not an equivalent-workload computational acceleration.
+  - Both Lossless and Dynamic FP8 modes with sinks yielded identical token completions, confirming that FP8 quantization in offloaded storage introduced zero additional greedy drift in this test.
 
 ### 3. Hyperdimensional Computing (HDC) Associative Memory (`core/memory.py`)
-- **Sub-Millisecond Bitwise Memory:**
-  - High-dimensional vectors are projected onto a 4096-bit binary hypervector basis.
-  - Fast similarity search powered by bitwise XOR and SIMD `popcount`.
-  - **Empirical Results:** Across 5,000 vectors with noisy query perturbations, achieved **100.0% 1-NN recall accuracy** with sub-millisecond retrieval latency.
-  - Ideal for long-term agent episodic memory, neuromorphic on-chip coprocessing, and low-latency vector cache retrieval.
+- **Binary Projection & Retrieval:** High-dimensional embedding vectors (e.g., 768-dim) are projected onto a 4,096-bit binary basis and queried via bitwise XOR followed by SIMD bit population counting (`np.bitwise_count`).
+- **Synthetic Benchmark Results:** Evaluated on 5,000 synthetic vectors under 5% Gaussian query perturbation, achieving 100% 1-NN recall. This benchmark establishes the bitwise retrieval fidelity of the projection under controlled noise, while evaluation on independent semantic text datasets remains an open research item.
 
 ---
 
-## 13. Executive Dossier: Presentation & Submission Protocol for Tier-1 AI Labs (Claude, Meta, OpenAI)
+## 13. Peer-Review Submission Dossier & Engineering Inquiries
 
-When submitting Vantage V-AI to research engineers and reviewers at Anthropic (Claude), Meta FAIR, OpenAI, or Hugging Face, present the project along these rigorous dimensions:
-
-1. **System Identity:** Vantage V-AI is **not** a general LLM weight-training library or prompt engineering tool. It is an **open-source, bounded-memory runtime infrastructure** for high-throughput streaming and hierarchical KV-cache memory management.
-2. **Transparent Trade-offs (Peer-Review Grade):**
-   - **Lossless Prefix Parity:** 100% bit-for-bit equivalence (`torch.equal == True`) up to 4,096 tokens for prefill prompt reuse and session caching.
-   - **Quantized Streaming:** 1.58-bit Ternary (8.0x reduction, 0.887 CosSim) and FP8 (2.0x reduction, 0.9999 CosSim).
-   - **Attention Sinks:** Eliminates attention collapse in long-sequence decoding while delivering a 5.48x throughput improvement by bounding active attention complexity.
-3. **Reproducibility Guarantee:** All 40 unit tests pass locally (`pytest tests/ -v`). Raw multi-trial benchmark artifacts (`artifacts/benchmarks/benchmark_v8_sota.json`) provide full auditability across all tested seeds, shapes, and metrics.
+When presenting Vantage V-AI to research engineers and external reviewers (Hugging Face, Anthropic, Meta, OpenAI), the project is framed as an exploratory inference runtime focusing on:
+1. **Bounded Attention Footprint:** Evaluating how runtime block offloading and attention sink preservation affect long-context autoregressive decoding speed.
+2. **Quantized Prefix Offloading:** Measuring the recovery fidelity of 2-bit packed ternary and FP8 quantization formats during cache serialization.
+3. **Reproducibility:** A fully automated 40-test suite (`pytest tests/ -v`) accompanied by raw trial JSON artifacts (`artifacts/benchmarks/benchmark_v8_sota.json`).
 

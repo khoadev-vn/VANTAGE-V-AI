@@ -1,24 +1,25 @@
-# Vantage V-AI: Frontier Bounded-Memory Streaming, 1.58-bit Ternary KV-Cache & HDC Associative Memory
+# Vantage V-AI: Bounded-Memory Streaming Engine, 2-Bit Packed Ternary KV-Cache & HDC Associative Memory
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-40%20Passing%20(Local)-brightgreen.svg)](tests/)
 [![Version](https://img.shields.io/badge/Version-8.0.0-purple.svg)](pyproject.toml)
 
-**Vantage V-AI (v8.0.0)** is a **SOTA bounded-memory streaming engine, 1.58-bit ternary KV-cache, and hyperdimensional associative memory architecture** engineered for next-generation frontier LLMs (Anthropic Claude, Meta Llama, OpenAI GPT), neuromorphic edge devices, and autonomous agent systems.
+**Vantage V-AI (v8.0.0)** is an experimental, open-source inference runtime and streaming data processing library designed to investigate memory-efficient autoregressive generation, bounded working sets, and associative retrieval.
 
-> **Key Architectural Breakthroughs in v8.0.0:**
-> 1. **BitNet b1.58 Ternary KV Quantization (`QUANT_TERNARY_158`):**
->    - Quantizes multi-head attention keys and values into 2-bit packed ternary states $\{-1, 0, +1\}$ with per-layer scaling factors.
->    - Achieves **7.97x memory reduction** over FP16 (16.0x over FP32) with high directional cosine similarity ($0.887$).
-> 2. **Attention Sink Streaming Engine (`VantageStreamingCache`):**
->    - Implements streaming attention sinks (`sink_tokens=4`) to permanently anchor initial attention mass, preventing autoregressive perplexity collapse and repetitive token loops.
->    - Delivers a **5.48x E2E inference throughput speedup** (**77.95 ± 3.86 tok/s** vs **14.23 ± 0.43 tok/s**) compared to standard Hugging Face `DynamicCache` on real pretrained `gpt2` (512-token prompt).
+> **Core Research Directions in v8.0.0:**
+> 1. **2-Bit Packed Ternary Representation (Inspired by BitNet b1.58):**
+>    - Quantizes multi-head attention keys and values into ternary states $\{-1, 0, +1\}$ with per-tensor mean dynamic scaling.
+>    - Uses vectorized SIMD packing (4 elements per `uint8` byte = 2.0 bits/element), achieving **7.97x storage reduction** over FP16 (close to the theoretical 8.0x limit for 2-bit packing) with a measured cosine similarity of 0.887 and MAE of 0.357.
+> 2. **Streaming KV-Cache with Attention Sinks (Inspired by StreamingLLM):**
+>    - Integrates initial attention sink retention (`sink_tokens=4`) within a block-level offloading cache (`VantageStreamingCache`).
+>    - In a 512-token prompt CPU experiment on pretrained `gpt2`, bounded attention ($W=256$) achieved **77.95 ± 3.86 tok/s** compared to **14.23 ± 0.43 tok/s** for standard full-attention `DynamicCache`.
+>    - *Scientific Note:* This 5.48x throughput difference reflects the $O(N \cdot W)$ vs $O(N^2)$ attention-budget trade-off rather than equivalent-workload computational speedup.
 > 3. **Hyperdimensional Computing (HDC) Associative Memory (`core/memory.py`):**
->    - Projects high-dimensional embedding vectors into 4096-bit dense binary hypervectors.
->    - Hardware-accelerated bitwise XOR + SIMD popcount distance search achieving **100.0% 1-NN recall** across 5,000 vectors with sub-millisecond per-query retrieval.
-> 4. **100% Bit-for-Bit Lossless Parity (`QUANT_LOSSLESS`):**
->    - Full session checkpointing with verified bit-for-bit equality (`torch.equal == True`) across context lengths up to 4,096 tokens.
+>    - Projects embeddings into 4,096-bit binary hypervectors with SIMD popcount bitwise search (`np.bitwise_count`).
+>    - Evaluated on synthetic noisy query perturbation over 5,000 vectors, achieving 100% 1-NN synthetic recall with sub-millisecond retrieval.
+> 4. **Lossless Session Checkpointing (`QUANT_LOSSLESS`):**
+>    - Full prefix KV serialization with verified bit-for-bit equality (`torch.equal == True`) across context lengths up to 4,096 tokens.
 
 ---
 
