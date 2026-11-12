@@ -20,7 +20,7 @@ from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass
 from enum import Enum
 import zlib
-from typing import Callable, Deque, List, Optional, Protocol, Union
+from typing import BinaryIO, Callable, Deque, Iterable, List, Optional, Protocol, Union
 
 import lz4.block
 import lz4.frame
@@ -171,6 +171,21 @@ class CallbackSink:
         return self._total_bytes
 
 
+class FileSink:
+    """Streams processed frames directly to a binary file-like object."""
+
+    def __init__(self, stream: BinaryIO) -> None:
+        self._stream = stream
+        self._total_bytes = 0
+
+    def write(self, frame: bytes) -> None:
+        self._stream.write(frame)
+        self._total_bytes += len(frame)
+
+    def total_bytes(self) -> int:
+        return self._total_bytes
+
+
 def compress_chunk(
     chunk: BufferLike,
     codec: CodecType = CodecType.LZ4_FRAME,
@@ -278,6 +293,137 @@ class StatelessStreamProcessor:
                     f"CRC32 mismatch: expected {expected_crc32:#010x}, got {actual_crc:#010x}"
                 )
         return restored
+
+    def process_iter(self, chunks: Iterable[BufferLike], sink: OutputSink) -> StreamStats:
+        """
+        True incremental streaming over an iterable of buffer-like chunks.
+
+        Memory remains bounded by ``chunk_bytes`` + ``sink`` capacity regardless
+        of total stream length (e.g., 64 MiB, 1 GiB+).
+        """
+        total_in = 0
+        total_out = 0
+        frames = 0
+        crc = 0
+        buf = bytearray()
+
+        for item in chunks:
+            view = memoryview(item)
+            if len(view) == 0:
+                continue
+            total_in += len(view)
+            buf.extend(view)
+
+            while len(buf) >= self.chunk_bytes:
+                slice_view = memoryview(buf)[: self.chunk_bytes]
+                if self.compute_checksum:
+                    crc = zlib.crc32(slice_view, crc)
+                frame = compress_chunk(
+                    slice_view,
+                    codec=self.codec,
+                    compression_level=self.compression_level,
+                    content_checksum=self.frame_checksum,
+                )
+                slice_view.release()
+                sink.write(frame)
+                total_out += len(frame)
+                frames += 1
+                del buf[: self.chunk_bytes]
+
+        if len(buf) > 0:
+            tail_view = memoryview(buf)
+            if self.compute_checksum:
+                crc = zlib.crc32(tail_view, crc)
+            frame = compress_chunk(
+                tail_view,
+                codec=self.codec,
+                compression_level=self.compression_level,
+                content_checksum=self.frame_checksum,
+            )
+            sink.write(frame)
+            total_out += len(frame)
+            frames += 1
+
+        return StreamStats(
+            input_bytes=total_in,
+            output_bytes=total_out,
+            frames=frames,
+            crc32=crc & 0xFFFFFFFF,
+        )
+
+
+class AdaptiveStreamProcessor(StatelessStreamProcessor):
+    """
+    Adaptive chunk-sizing processor (v6.0).
+
+    Selects 256 KiB chunks for low-compressibility payloads (ratio < 2.0x)
+    and 512 KiB chunks for highly compressible payloads (ratio >= 2.0x) based
+    on a lightweight probe of the first chunk.
+    """
+
+    def __init__(
+        self,
+        low_entropy_chunk_bytes: int = 512 * 1024,
+        high_entropy_chunk_bytes: int = 256 * 1024,
+        codec: CodecType = CodecType.LZ4_BLOCK,
+        compression_level: int = 0,
+        compute_checksum: bool = False,
+        frame_checksum: bool = True,
+    ) -> None:
+        super().__init__(
+            chunk_bytes=high_entropy_chunk_bytes,
+            codec=codec,
+            compression_level=compression_level,
+            compute_checksum=compute_checksum,
+            frame_checksum=frame_checksum,
+        )
+        self.low_entropy_chunk_bytes = low_entropy_chunk_bytes
+        self.high_entropy_chunk_bytes = high_entropy_chunk_bytes
+
+    def select_chunk_bytes(self, sample: memoryview) -> int:
+        probe_len = min(len(sample), 64 * 1024)
+        if probe_len == 0:
+            return self.high_entropy_chunk_bytes
+        probe_out = compress_chunk(
+            sample[:probe_len],
+            codec=self.codec,
+            compression_level=self.compression_level,
+            content_checksum=self.frame_checksum,
+        )
+        ratio = probe_len / max(1, len(probe_out))
+        return self.low_entropy_chunk_bytes if ratio >= 2.0 else self.high_entropy_chunk_bytes
+
+    def process(self, data: BufferLike, sink: OutputSink) -> StreamStats:
+        view = memoryview(data)
+        total_len = len(view)
+        if total_len == 0:
+            return StreamStats(input_bytes=0, output_bytes=0, frames=0, crc32=0)
+
+        chosen_chunk = self.select_chunk_bytes(view)
+        out_bytes = 0
+        frames = 0
+        crc = 0
+
+        for offset in range(0, total_len, chosen_chunk):
+            chunk = view[offset : offset + chosen_chunk]
+            if self.compute_checksum:
+                crc = zlib.crc32(chunk, crc)
+            frame = compress_chunk(
+                chunk,
+                codec=self.codec,
+                compression_level=self.compression_level,
+                content_checksum=self.frame_checksum,
+            )
+            sink.write(frame)
+            out_bytes += len(frame)
+            frames += 1
+
+        return StreamStats(
+            input_bytes=total_len,
+            output_bytes=out_bytes,
+            frames=frames,
+            crc32=crc & 0xFFFFFFFF,
+        )
 
 
 class ParallelStreamProcessor(StatelessStreamProcessor):

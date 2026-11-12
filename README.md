@@ -4,10 +4,10 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-11%20Passing-brightgreen.svg)](tests/test_engine.py)
 
-**Vantage V-AI (v5.2)** is a research prototype for **stateless, bounded-memory streaming data processing and compression** in resource-constrained AI/edge pipelines.
+**Vantage V-AI (v6.0)** is a **stateless, bounded-memory incremental streaming engine** for resource-constrained AI/edge data pipelines.
 
 > **Scientific Positioning:**
-> Vantage V-AI is a **data processing and streaming compression layer**, not an LLM inference runtime. Earlier v4.0 claims (`4.3B tokens/s`, `<2MB RAM`) were retracted. Version 5.2 adds **root-cause validation** (chunking parity, chunk-size sweep from `64 KiB` to `8 MiB`, and `CRC32` cost isolation) on top of v5.1's codec-parity benchmarks and isolated-subprocess `Peak RSS` profiling.
+> Vantage V-AI is a **data processing and streaming compression layer**, not an LLM inference runtime. Earlier v4.0 claims (`4.3B tokens/s`, `<2MB RAM`) were retracted. Version 6.0 introduces **true incremental streaming (`process_iter`)**, **`FileSink`**, **adaptive chunk sizing (`AdaptiveStreamProcessor`)**, and **isolated-subprocess verification** of the `256 KiB` vs `512 KiB` throughput cliff.
 
 ---
 
@@ -70,7 +70,16 @@ Raw trial data: [`benchmarks/results/benchmark_results.csv`](benchmarks/results/
 **Root-Cause Validation (v5.2, [`benchmarks/v52_root_cause.py`](benchmarks/v52_root_cause.py)):**
 1. **Chunking Parity:** Plain Python `memoryview` + `256 KiB` `lz4.block.compress` (`python_lz4_block_chunked`) matches `vantage_lz4_block_raw` (`1494–7754 MB/s` vs `1636–6816 MB/s`, identical `0.254–0.754 MB` `PyPeak`). Thus, the throughput and heap-allocation gains come from the **chunking strategy**, while Vantage's contribution is packaging it into a stateless, bounded-sink streaming architecture.
 2. **Chunk-Size Sweep (`64 KiB`–`8 MiB`):** On `random`, throughput peaks at **`256 KiB` (`3915.6 MB/s`)** and drops sharply at **`512 KiB` (`917.9 MB/s`)**. Slicing data into `256 KiB` chunks via `memoryview` reduces the processing unit size and limits concurrent transient allocations; cache-locality effects require hardware counter profiling to confirm.
-3. **CRC32 Cost Isolation:** `crc32_only` runs at `1356–1658 MB/s` (`4.8–5.9 ms`), whereas `compress_only` runs at `1613–5661 MB/s` (`1.4–5.0 ms`), confirming that `zlib.crc32` accounts for ~50–80% of runtime when integrity checks are enabled.
+3. **CRC32 Cost Isolation:** `CRC32` introduces substantial additional processing overhead, accounting for approximately **48–81%** of the combined execution time under the tested workloads (`crc32_only` `1356–1658 MB/s` vs `compress_plus_crc32` `735–1327 MB/s`). This is an empirical comparison, not an isolated attribution of CPU cost.
+
+### 2. v6.0 Production Core Validation ([`benchmarks/v60_validation.py`](benchmarks/v60_validation.py))
+- **Isolated `256 KiB` → `512 KiB` Cliff Re-Verification (`random`, 3 seeds, randomized order, 10 trials):** Confirmed reproducible across all seeds (`256 KiB`: `1874.81–4537.08 MB/s` vs `512 KiB`: `740.79–1240.68 MB/s` vs `1024 KiB`: `771.30–1140.62 MB/s`).
+- **62.16 MiB Incremental Streaming (`process_iter`, `256 KiB` chunks):**
+  - `NullSink`: **`3120.14 MB/s`**, **`0.747 MB` Python heap peak** (`0 B` retained).
+  - `BoundedMemorySink (2 MiB cap)`: **`3188.01 MB/s`**, **`0.993 MB` Python heap peak** (`268,543 B` retained).
+- **`AdaptiveStreamProcessor` vs Fixed Chunk Size (8 MiB, 15 trials):**
+  - `repeated`: `fixed_256k` `10207.99 MB/s`, `fixed_512k` `11936.74 MB/s`, **`adaptive` `11778.56 MB/s`** (automatically selects `512 KiB`).
+  - `random`: `fixed_256k` `5909.29 MB/s`, `fixed_512k` `1946.90 MB/s`, **`adaptive` `5683.43 MB/s`** (automatically selects `256 KiB`).
 
 ### 2. Isolated Subprocess Full-Lifecycle Peak RSS (`8 MiB random`)
 

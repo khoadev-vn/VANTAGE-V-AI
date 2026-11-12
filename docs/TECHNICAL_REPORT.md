@@ -1,7 +1,7 @@
-# Vantage V-AI v5.2 Technical Report: Stateless Streaming & Root-Cause Validation
+# Vantage V-AI v6.0 Technical Report: Production Streaming Core & Anomaly Verification
 
 **Author:** Nguyen Vo Anh Khoa  
-**Version:** 5.2 (Root-Cause Validation)  
+**Version:** 6.0.0 (Production Streaming Core)  
 **Repository:** `khoadev-vn/VANTAGE-V-AI`  
 **Academic Reference:** *MLSysBook Vol. I* (`https://mlsysbook.ai/vol1/`)
 
@@ -43,10 +43,18 @@ Vantage V-AI v5.1 resolves these flaws with a strictly stateless streaming core 
 
 1. **Chunking Parity (`python_lz4_block_chunked` vs `vantage_lz4_block_raw`):** Both use `memoryview` `256 KiB` slices + `lz4.block.compress` without CRC32 and achieve comparable throughput (`7754` vs `6816 MB/s` on `repeated`; `1494` vs `1636 MB/s` on `json_records`; `2267` vs `2064 MB/s` on `ai_corpus`; `2220` vs `2799 MB/s` on `random`) and identical `PyPeak` (`0.254–0.754 MB`). This confirms the speedup stems from the chunking strategy rather than a novel compression algorithm.
 2. **Chunk-Size Sweep (`64 KiB`–`8 MiB`):** On `random`, throughput peaks at `256 KiB` (`3915.6 MB/s`) before dropping to `917.9 MB/s` at `512 KiB`. Slicing data into `256 KiB` chunks via `memoryview` reduces processing unit size and limits concurrent transient allocations; hardware counter profiling is needed to confirm cache-locality effects.
-3. **CRC32 Cost Isolation:** `crc32_only` (`1356–1658 MB/s`) vs `compress_only` (`1613–5661 MB/s`) vs `compress_plus_crc32` (`735–1327 MB/s`) directly isolates checksum overhead.
+3. **CRC32 Cost Isolation:** `CRC32` introduces substantial additional processing overhead, accounting for approximately **48–81%** of the combined execution time under the tested workloads (`crc32_only` `1356–1658 MB/s` vs `compress_plus_crc32` `735–1327 MB/s`). This is an empirical comparison, not an isolated attribution of CPU cost.
 
 ---
 
-## 5. Next Phase: End-to-End Edge AI Integration
+## 5. v6.0 Production Core Validation
+
+1. **Isolated Subprocess Re-Check of `256 KiB` → `512 KiB` Cliff:** Across 3 random seeds in randomized order (`10` trials each), `256 KiB` (`1874.81–4537.08 MB/s`) consistently outperforms `512 KiB` (`740.79–1240.68 MB/s`) and `1024 KiB` (`771.30–1140.62 MB/s`), confirming the transition is not an ordering or single-seed artifact.
+2. **62.16 MiB Incremental Streaming (`process_iter`):** Streams `256 × 256 KiB` chunks at **`3120.14 MB/s`** (`NullSink`, `0.747 MB` Python heap peak) and **`3188.01 MB/s`** (`BoundedMemorySink` 2 MiB cap, `0.993 MB` Python heap peak).
+3. **`AdaptiveStreamProcessor`:** Probes the first `64 KiB` to select `512 KiB` for compressible payloads (`11778.56 MB/s` on `repeated`) and `256 KiB` for incompressible payloads (`5683.43 MB/s` on `random`).
+
+---
+
+## 6. Next Phase: End-to-End Edge AI Integration
 
 Following *MLSysBook Vol. I*, the next milestone is integrating Vantage's bounded-memory streaming layer with a real quantized edge inference runtime (e.g., `llama.cpp` or ONNX Runtime) to evaluate **TTFT**, **end-to-end tokens/s**, and **total Peak RSS** on identical prompts and model weights.

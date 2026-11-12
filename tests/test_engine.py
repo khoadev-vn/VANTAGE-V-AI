@@ -8,10 +8,12 @@ import pytest
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from core.engine import (
+    AdaptiveStreamProcessor,
     BoundedMemorySink,
     CallbackSink,
     CodecType,
     CollectingSink,
+    FileSink,
     NullSink,
     ParallelStreamProcessor,
     StatelessStreamProcessor,
@@ -125,3 +127,43 @@ def test_vantage_engine_facade_is_bounded():
         engine.fast_commit_batch(chunk)
 
     assert engine.get_vault_size() <= 4096
+
+
+def test_incremental_process_iter_and_file_sink():
+    import io
+
+    parts = [b"VANTAGE_STREAM_" * 5000, os.urandom(70_000), b"TAIL_DATA" * 1000]
+    full_payload = b"".join(parts)
+    expected_crc = zlib.crc32(full_payload) & 0xFFFFFFFF
+
+    proc = StatelessStreamProcessor(chunk_bytes=32 * 1024, codec=CodecType.LZ4_FRAME)
+    csink = CollectingSink()
+    stats = proc.process_iter(parts, csink)
+
+    assert stats.input_bytes == len(full_payload)
+    assert stats.crc32 == expected_crc
+    assert proc.verify_roundtrip(csink.frames(), expected_crc32=stats.crc32) == full_payload
+
+    bio = io.BytesIO()
+    fsink = FileSink(bio)
+    fstats = proc.process_iter(parts, fsink)
+    assert fsink.total_bytes() == fstats.output_bytes
+    assert len(bio.getvalue()) == fstats.output_bytes
+
+
+def test_adaptive_stream_processor_selects_chunk_and_verifies():
+    proc = AdaptiveStreamProcessor(
+        low_entropy_chunk_bytes=512 * 1024,
+        high_entropy_chunk_bytes=256 * 1024,
+        codec=CodecType.LZ4_BLOCK,
+        compute_checksum=True,
+    )
+    compressible = b"A" * (1024 * 1024)
+    incompressible = os.urandom(1024 * 1024)
+
+    assert proc.select_chunk_bytes(memoryview(compressible)) == 512 * 1024
+    assert proc.select_chunk_bytes(memoryview(incompressible)) == 256 * 1024
+
+    sink = CollectingSink()
+    stats = proc.process(incompressible, sink)
+    assert proc.verify_roundtrip(sink.frames(), expected_crc32=stats.crc32) == incompressible
