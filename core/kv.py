@@ -126,6 +126,38 @@ def compute_quantization_error(
     )
 
 
+def pack_ternary_torch(tensor: "torch.Tensor") -> Tuple["torch.Tensor", float, "torch.Size"]:
+    """
+    GPU-native vectorized 2-bit packing of ternary values directly in PyTorch CUDA/CPU tensors.
+    Zero-copy to CPU host memory, zero NumPy overhead.
+    """
+    orig_shape = tensor.shape
+    flat = tensor.reshape(-1)
+    scale = float(torch.mean(torch.abs(flat)).item()) + 1e-8
+
+    ternary = torch.clamp(torch.round(flat / scale), -1, 1).to(torch.int8)
+
+    pad_len = (4 - (ternary.numel() % 4)) % 4
+    if pad_len > 0:
+        ternary = torch.nn.functional.pad(ternary, (0, pad_len), value=0)
+
+    # Map {-1, 0, 1} -> {0, 1, 2} and pack 4 elements per uint8 byte
+    mapped = (ternary + 1).to(torch.uint8).reshape(-1, 4)
+    packed = (mapped[:, 0]) | (mapped[:, 1] << 2) | (mapped[:, 2] << 4) | (mapped[:, 3] << 6)
+    return packed, scale, orig_shape
+
+
+def unpack_ternary_torch(packed: "torch.Tensor", scale: float, orig_shape: "torch.Size") -> "torch.Tensor":
+    """GPU-native unpacking of 2-bit ternary packed tensors back to float16."""
+    u0 = (packed & 0x03).to(torch.float32) - 1.0
+    u1 = ((packed >> 2) & 0x03).to(torch.float32) - 1.0
+    u2 = ((packed >> 4) & 0x03).to(torch.float32) - 1.0
+    u3 = ((packed >> 6) & 0x03).to(torch.float32) - 1.0
+    unpacked = torch.stack([u0, u1, u2, u3], dim=1).reshape(-1)
+    target_numel = orig_shape.numel()
+    return (unpacked[:target_numel] * scale).reshape(orig_shape).to(torch.float16)
+
+
 def pack_ternary_2bit(arr_ternary: np.ndarray) -> bytes:
     """
     Vectorized 2-bit packing of ternary values in {-1, 0, +1}.
