@@ -395,23 +395,26 @@ class StatelessStreamProcessor:
 
 class AdaptiveStreamProcessor(StatelessStreamProcessor):
     """
-    Dynamic adaptive chunk-sizing processor (v6.1).
+    Dynamic adaptive chunk-sizing processor with hysteresis (v6.2).
 
-    Monitors the compression ratio of each processed chunk and dynamically
-    selects ``low_entropy_chunk_bytes`` (default 512 KiB) when ratio >= 2.0
-    or ``high_entropy_chunk_bytes`` (default 256 KiB) when ratio < 2.0,
-    allowing immediate adaptation when entropy shifts mid-stream.
+    Monitors the compression ratio of each processed chunk and switches between
+    ``low_entropy_chunk_bytes`` (ratio >= 2.0) and ``high_entropy_chunk_bytes``
+    (ratio < 2.0) only after ``hysteresis_chunks`` consecutive observations in
+    the new regime, preventing thrashing on noisy or alternating streams.
     """
 
     def __init__(
         self,
         low_entropy_chunk_bytes: int = 512 * 1024,
         high_entropy_chunk_bytes: int = 256 * 1024,
+        hysteresis_chunks: int = 2,
         codec: CodecType = CodecType.LZ4_BLOCK,
         compression_level: int = 0,
         compute_checksum: bool = False,
         frame_checksum: bool = True,
     ) -> None:
+        if hysteresis_chunks < 1:
+            raise ValueError("hysteresis_chunks must be >= 1")
         super().__init__(
             chunk_bytes=high_entropy_chunk_bytes,
             codec=codec,
@@ -421,6 +424,7 @@ class AdaptiveStreamProcessor(StatelessStreamProcessor):
         )
         self.low_entropy_chunk_bytes = low_entropy_chunk_bytes
         self.high_entropy_chunk_bytes = high_entropy_chunk_bytes
+        self.hysteresis_chunks = hysteresis_chunks
 
     def select_chunk_bytes(self, sample: memoryview) -> int:
         probe_len = min(len(sample), 64 * 1024)
@@ -435,9 +439,19 @@ class AdaptiveStreamProcessor(StatelessStreamProcessor):
         ratio = probe_len / max(1, len(probe_out))
         return self.low_entropy_chunk_bytes if ratio >= 2.0 else self.high_entropy_chunk_bytes
 
-    def _next_chunk_size(self, in_len: int, out_len: int) -> int:
+    def _target_chunk_size(self, in_len: int, out_len: int) -> int:
         ratio = in_len / max(1, out_len)
         return self.low_entropy_chunk_bytes if ratio >= 2.0 else self.high_entropy_chunk_bytes
+
+    def _update_hysteresis(
+        self, current_chunk: int, target_chunk: int, streak: int
+    ) -> tuple[int, int]:
+        if target_chunk == current_chunk:
+            return current_chunk, 0
+        streak += 1
+        if streak >= self.hysteresis_chunks:
+            return target_chunk, 0
+        return current_chunk, streak
 
     def process(self, data: BufferLike, sink: OutputSink) -> StreamStats:
         view = memoryview(data)
@@ -446,6 +460,7 @@ class AdaptiveStreamProcessor(StatelessStreamProcessor):
             return StreamStats(input_bytes=0, output_bytes=0, frames=0, crc32=0)
 
         current_chunk = self.select_chunk_bytes(view)
+        streak = 0
         offset = 0
         out_bytes = 0
         frames = 0
@@ -465,7 +480,8 @@ class AdaptiveStreamProcessor(StatelessStreamProcessor):
             out_bytes += len(frame)
             frames += 1
             offset += len(chunk)
-            current_chunk = self._next_chunk_size(len(chunk), len(frame))
+            target = self._target_chunk_size(len(chunk), len(frame))
+            current_chunk, streak = self._update_hysteresis(current_chunk, target, streak)
 
         return StreamStats(
             input_bytes=total_len,
@@ -475,13 +491,14 @@ class AdaptiveStreamProcessor(StatelessStreamProcessor):
         )
 
     def process_iter(self, chunks: Iterable[BufferLike], sink: OutputSink) -> StreamStats:
-        """Dynamic adaptive incremental streaming over an iterable of buffers."""
+        """Dynamic adaptive incremental streaming with hysteresis."""
         total_in = 0
         total_out = 0
         frames = 0
         crc = 0
         buf = bytearray()
         current_chunk = self.high_entropy_chunk_bytes
+        streak = 0
         initialized = False
 
         for item in chunks:
@@ -512,7 +529,8 @@ class AdaptiveStreamProcessor(StatelessStreamProcessor):
                 total_out += len(frame)
                 frames += 1
                 del buf[:current_chunk]
-                current_chunk = self._next_chunk_size(current_chunk, len(frame))
+                target = self._target_chunk_size(current_chunk, len(frame))
+                current_chunk, streak = self._update_hysteresis(current_chunk, target, streak)
 
         if len(buf) > 0:
             tail_view = memoryview(buf)

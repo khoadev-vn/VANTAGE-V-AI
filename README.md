@@ -4,10 +4,10 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-16%20Passing-brightgreen.svg)](tests/test_engine.py)
 
-**Vantage V-AI (v6.1)** is a **stateless, bounded-memory adaptive streaming engine** for resource-constrained data pipelines.
+**Vantage V-AI (v6.2)** is a **stateless, bounded-memory adaptive streaming engine** for resource-constrained data pipelines.
 
 > **Scientific Positioning:**
-> Vantage V-AI is **not** a new compression algorithm and **not** an LLM inference runtime. Its technical contribution is a **bounded-memory streaming architecture** (`process_iter`, `BoundedMemorySink`, `FileSink` with partial-write safety and length-prefixed framing) paired with **dynamic per-chunk adaptive sizing** (`AdaptiveStreamProcessor`) that keeps OS-level `Peak RSS` constant (`~22.5–24.9 MB`) across `64 MiB` to `4 GiB` streams.
+> Vantage V-AI is **not** a new compression algorithm and **not** an LLM inference runtime. Its technical contribution is a **bounded-memory streaming architecture** (`process_iter`, `BoundedMemorySink`, `FileSink` with partial-write safety and length-prefixed framing) paired with opt-in **hysteresis-based adaptive chunking** (`AdaptiveStreamProcessor`). The measured process memory remained approximately constant (`22.52–25.13 MB` OS `Peak RSS`) as input size increased from `64 MiB` to `16 GiB`, under a fixed chunk size and bounded sink configuration.
 
 ---
 
@@ -110,6 +110,33 @@ Measured in a fresh Python process per baseline ([`benchmarks/isolated_memory_be
 Measured on a **1 MiB slice** of `ai_corpus` (`1,048,576` bytes → `251,940` actual tokens):
 - **Median Time:** `88.24 ms` → **`2,855,145.1 tokens/s`** (`11.33 MB/s`)
 - *Note:* This is a standalone tokenizer baseline—not LLM inference, not token generation, and not accelerated by Vantage.
+
+### 4. v6.2 Stress Testing (`4 GiB → 16 GiB`), Backpressure RSS & Adaptive Ablation ([`benchmarks/v62_stress_and_ablation.py`](benchmarks/v62_stress_and_ablation.py))
+
+#### A. Extreme Bounded-Memory Stress Test (`4 GiB → 16 GiB`, Isolated Subprocesses)
+| Stream Size | Sink | Throughput (MB/s) | Time (s) | OS Peak RSS (MB) | PyPeak (MB) | Retained (B) |
+| :--- | :--- | ---: | ---: | ---: | ---: | ---: |
+| `4 GiB` | `BoundedMemorySink (2 MiB)` | 4079.00 | 1.004 | **24.96** | 2.579 | 2,096,576 |
+| `8 GiB` | `BoundedMemorySink (2 MiB)` | 3857.59 | 2.124 | **25.13** | 2.579 | 2,096,576 |
+| `16 GiB` | `BoundedMemorySink (2 MiB)` | 4095.34 | 4.001 | **24.82** | 2.579 | 2,096,576 |
+| `16 GiB` | `NullSink` | **4828.67** | **3.393** | **22.18** | **0.504** | 0 |
+
+#### B. Backpressure + Bounded Memory Combined Proof (`32 MiB random`, Isolated Subprocesses)
+- `NullSink`: `795.68 MB/s` (`0.040 s`), `Peak RSS = 23.32 MB`, `PyPeak = 1.004 MB`
+- `BoundedMemorySink (2 MiB)`: `775.44 MB/s` (`0.041 s`), `Peak RSS = 24.50 MB`, `PyPeak = 2.511 MB`
+- `SlowCallbackSink (100 µs/frame)`: `296.99 MB/s` (`0.108 s`), **`Peak RSS = 22.90 MB`**, **`PyPeak = 1.004 MB`** (throttled producer, zero RAM growth)
+
+#### C. Adaptive Hysteresis Ablation & Adversarial Jitter (`16 MiB`, 10 trials, MB/s P50)
+| Dataset | `fixed_128k` | `fixed_256k` | `fixed_512k` | `adapt_h1` | `adapt_h3` |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| `repeated` | 7828.4 | 8524.0 | 9806.0 | 8746.5 | **10862.2** |
+| `random` | **5285.8** | 4681.4 | 1769.2 | 4863.1 | 5175.1 |
+| `low_then_high` | 4983.3 | **5606.0** | 1963.6 | 4153.9 | 4135.0 |
+| `high_then_low` | 9513.6 | 10070.5 | **11157.2** | 10179.4 | 9470.5 |
+| `alternating` | **6887.5** | 6737.1 | 2435.1 | 3034.1 | 2363.9 |
+| `adversarial_jitter` | 5594.4 | **6208.1** | 1908.6 | 2029.5 | 1944.1 |
+
+> **Design Recommendation:** Because rapid entropy shifts (`alternating`, `adversarial_jitter`) penalize any `512 KiB` chunk that straddles incompressible bytes, `StatelessStreamProcessor(chunk_bytes=256 * 1024)` remains the **recommended default**, while `AdaptiveStreamProcessor(hysteresis_chunks=3)` is an opt-in policy for coarse-grained workloads.
 
 ---
 

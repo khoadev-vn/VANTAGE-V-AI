@@ -211,22 +211,23 @@ def test_file_sink_stalled_stream_raises_oserror():
 
 
 def test_adaptive_dynamic_heterogeneous_streams():
-    proc = AdaptiveStreamProcessor(
-        low_entropy_chunk_bytes=512 * 1024,
-        high_entropy_chunk_bytes=256 * 1024,
-        codec=CodecType.LZ4_BLOCK,
-        compute_checksum=True,
-    )
-    low_then_high = (b"R" * (600 * 1024)) + os.urandom(900 * 1024)
-    high_then_low = os.urandom(300 * 1024) + (b"S" * (1100 * 1024))
+    for hyst in (1, 3):
+        proc = AdaptiveStreamProcessor(
+            low_entropy_chunk_bytes=512 * 1024,
+            high_entropy_chunk_bytes=256 * 1024,
+            hysteresis_chunks=hyst,
+            codec=CodecType.LZ4_BLOCK,
+            compute_checksum=True,
+        )
+        low_then_high = (b"R" * (600 * 1024)) + os.urandom(900 * 1024)
+        high_then_low = os.urandom(300 * 1024) + (b"S" * (1100 * 1024))
 
-    for payload in (low_then_high, high_then_low):
-        sink = CollectingSink()
-        stats = proc.process(payload, sink)
-        assert proc.verify_roundtrip(sink.frames(), expected_crc32=stats.crc32) == payload
+        for payload in (low_then_high, high_then_low):
+            sink = CollectingSink()
+            stats = proc.process(payload, sink)
+            assert proc.verify_roundtrip(sink.frames(), expected_crc32=stats.crc32) == payload
 
-        # Also test incremental process_iter on heterogeneous chunks
-        isink = CollectingSink()
-        chunks = [payload[i : i + 100_000] for i in range(0, len(payload), 100_000)]
-        istats = proc.process_iter(chunks, isink)
-        assert proc.verify_roundtrip(isink.frames(), expected_crc32=istats.crc32) == payload
+            isink = CollectingSink()
+            chunks = [payload[i : i + 100_000] for i in range(0, len(payload), 100_000)]
+            istats = proc.process_iter(chunks, isink)
+            assert proc.verify_roundtrip(isink.frames(), expected_crc32=istats.crc32) == payload

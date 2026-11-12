@@ -1,7 +1,7 @@
-# Vantage V-AI v6.1 Technical Report: Large-Scale Bounded Streaming & Adaptive Validation
+# Vantage V-AI v6.2 Technical Report: Memory Stress (16 GiB), Backpressure RSS & Adaptive Ablation
 
 **Author:** Nguyen Vo Anh Khoa  
-**Version:** 6.1.0 (Bounded-Memory Adaptive Streaming Engine)  
+**Version:** 6.2.0 (Adaptive Policy & Memory Stress Testing)  
 **Repository:** `khoadev-vn/VANTAGE-V-AI`  
 **Academic Reference:** *MLSysBook Vol. I* (`https://mlsysbook.ai/vol1/`)
 
@@ -63,6 +63,14 @@ Vantage V-AI v5.1 resolves these flaws with a strictly stateless streaming core 
 
 ---
 
-## 7. Next Phase: End-to-End Edge AI Integration
+## 7. v6.2 Stress Testing (`4–16 GiB`), Backpressure RSS & Adaptive Ablation
+
+1. **Bounded-Memory Scaling (`64 MiB → 16 GiB`):** Under fixed chunk size (`256 KiB`) and `BoundedMemorySink(2 MiB)`, `PyPeak` grows from `0.777 MB` (`64 MiB`) to `2.579 MB` (`1 GiB`) as the sink fills, then remains constant at `2.579 MB` for `4 GiB`, `8 GiB`, and `16 GiB` (`OS Peak RSS = 24.82–25.13 MB`; `16 GiB NullSink = 22.18 MB`, `4828.67 MB/s`).
+2. **Backpressure + Bounded Memory:** Under `SlowCallbackSink (100 µs/frame)` on a `32 MiB` stream, throughput drops to `296.99 MB/s` while `OS Peak RSS` remains `22.90 MB` (`PyPeak = 1.004 MB`).
+3. **Adaptive Hysteresis Ablation:** `adapt_h3` (`hysteresis_chunks=3`) reaches `10862.2 MB/s` on `repeated` and `5175.1 MB/s` on `random`, but under `alternating` (`2363.9 MB/s`) and `adversarial_jitter` (`1944.1 MB/s`), `fixed_256k` (`6737.1` / `6208.1 MB/s`) remains superior.
+
+---
+
+## 8. Next Phase: End-to-End Edge AI Integration
 
 Following *MLSysBook Vol. I*, the next milestone is integrating Vantage's bounded-memory streaming layer with a real quantized edge inference runtime (e.g., `llama.cpp` or ONNX Runtime) to evaluate **TTFT**, **end-to-end tokens/s**, and **total Peak RSS** on identical prompts and model weights.
