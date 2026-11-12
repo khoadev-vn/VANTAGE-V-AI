@@ -18,6 +18,7 @@ from core.engine import (
     ParallelStreamProcessor,
     StatelessStreamProcessor,
     VantageEngine,
+    read_framed_stream,
 )
 
 
@@ -145,10 +146,10 @@ def test_incremental_process_iter_and_file_sink():
     assert proc.verify_roundtrip(csink.frames(), expected_crc32=stats.crc32) == full_payload
 
     bio = io.BytesIO()
-    fsink = FileSink(bio)
+    fsink = FileSink(bio, framed=True)
     fstats = proc.process_iter(parts, fsink)
-    assert fsink.total_bytes() == fstats.output_bytes
-    assert len(bio.getvalue()) == fstats.output_bytes
+    assert fsink.total_bytes() == fstats.output_bytes + 4 * fstats.frames
+    assert len(bio.getvalue()) == fsink.total_bytes()
 
 
 def test_adaptive_stream_processor_selects_chunk_and_verifies():
@@ -167,3 +168,65 @@ def test_adaptive_stream_processor_selects_chunk_and_verifies():
     sink = CollectingSink()
     stats = proc.process(incompressible, sink)
     assert proc.verify_roundtrip(sink.frames(), expected_crc32=stats.crc32) == incompressible
+
+
+def test_file_sink_partial_writes_and_framed_roundtrip(tmp_path):
+    import io
+
+    class PartialStream(io.BytesIO):
+        def write(self, b):
+            mv = memoryview(b)
+            return super().write(mv[:7])  # Force partial writes of at most 7 bytes
+
+    payload = (b"VANTAGE_FRAMED_" * 4000) + os.urandom(50_000)
+    expected_crc = zlib.crc32(payload) & 0xFFFFFFFF
+
+    proc = StatelessStreamProcessor(chunk_bytes=32 * 1024, codec=CodecType.LZ4_FRAME)
+    raw_stream = PartialStream()
+    fsink = FileSink(raw_stream, framed=True)
+    stats = proc.process(payload, fsink)
+
+    raw_stream.seek(0)
+    frames = list(read_framed_stream(raw_stream))
+    assert len(frames) == stats.frames
+    assert proc.verify_roundtrip(frames, expected_crc32=expected_crc) == payload
+
+    # Also test real disk file round-trip
+    disk_file = tmp_path / "stream.vnt"
+    with disk_file.open("wb") as f:
+        proc.process(payload, FileSink(f, framed=True))
+    with disk_file.open("rb") as f:
+        disk_frames = list(read_framed_stream(f))
+    assert proc.verify_roundtrip(disk_frames, expected_crc32=expected_crc) == payload
+
+
+def test_file_sink_stalled_stream_raises_oserror():
+    class StalledStream:
+        def write(self, b):
+            return 0
+
+    sink = FileSink(StalledStream(), framed=True)  # type: ignore[arg-type]
+    with pytest.raises(OSError):
+        sink.write(b"abc")
+
+
+def test_adaptive_dynamic_heterogeneous_streams():
+    proc = AdaptiveStreamProcessor(
+        low_entropy_chunk_bytes=512 * 1024,
+        high_entropy_chunk_bytes=256 * 1024,
+        codec=CodecType.LZ4_BLOCK,
+        compute_checksum=True,
+    )
+    low_then_high = (b"R" * (600 * 1024)) + os.urandom(900 * 1024)
+    high_then_low = os.urandom(300 * 1024) + (b"S" * (1100 * 1024))
+
+    for payload in (low_then_high, high_then_low):
+        sink = CollectingSink()
+        stats = proc.process(payload, sink)
+        assert proc.verify_roundtrip(sink.frames(), expected_crc32=stats.crc32) == payload
+
+        # Also test incremental process_iter on heterogeneous chunks
+        isink = CollectingSink()
+        chunks = [payload[i : i + 100_000] for i in range(0, len(payload), 100_000)]
+        istats = proc.process_iter(chunks, isink)
+        assert proc.verify_roundtrip(isink.frames(), expected_crc32=istats.crc32) == payload

@@ -1,13 +1,13 @@
-# Vantage V-AI: Stateless Streaming Data Processing Engine for Resource-Constrained AI Systems
+# Vantage V-AI: A Bounded-Memory Adaptive Streaming Engine for Resource-Constrained Systems
 
 [![Python](https://img.shields.io/badge/Python-3.12-blue.svg)](https://www.python.org/)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-11%20Passing-brightgreen.svg)](tests/test_engine.py)
+[![Tests](https://img.shields.io/badge/Tests-16%20Passing-brightgreen.svg)](tests/test_engine.py)
 
-**Vantage V-AI (v6.0)** is a **stateless, bounded-memory incremental streaming engine** for resource-constrained AI/edge data pipelines.
+**Vantage V-AI (v6.1)** is a **stateless, bounded-memory adaptive streaming engine** for resource-constrained data pipelines.
 
 > **Scientific Positioning:**
-> Vantage V-AI is a **data processing and streaming compression layer**, not an LLM inference runtime. Earlier v4.0 claims (`4.3B tokens/s`, `<2MB RAM`) were retracted. Version 6.0 introduces **true incremental streaming (`process_iter`)**, **`FileSink`**, **adaptive chunk sizing (`AdaptiveStreamProcessor`)**, and **isolated-subprocess verification** of the `256 KiB` vs `512 KiB` throughput cliff.
+> Vantage V-AI is **not** a new compression algorithm and **not** an LLM inference runtime. Its technical contribution is a **bounded-memory streaming architecture** (`process_iter`, `BoundedMemorySink`, `FileSink` with partial-write safety and length-prefixed framing) paired with **dynamic per-chunk adaptive sizing** (`AdaptiveStreamProcessor`) that keeps OS-level `Peak RSS` constant (`~22.5–24.9 MB`) across `64 MiB` to `4 GiB` streams.
 
 ---
 
@@ -72,14 +72,33 @@ Raw trial data: [`benchmarks/results/benchmark_results.csv`](benchmarks/results/
 2. **Chunk-Size Sweep (`64 KiB`–`8 MiB`):** On `random`, throughput peaks at **`256 KiB` (`3915.6 MB/s`)** and drops sharply at **`512 KiB` (`917.9 MB/s`)**. Slicing data into `256 KiB` chunks via `memoryview` reduces the processing unit size and limits concurrent transient allocations; cache-locality effects require hardware counter profiling to confirm.
 3. **CRC32 Cost Isolation:** `CRC32` introduces substantial additional processing overhead, accounting for approximately **48–81%** of the combined execution time under the tested workloads (`crc32_only` `1356–1658 MB/s` vs `compress_plus_crc32` `735–1327 MB/s`). This is an empirical comparison, not an isolated attribution of CPU cost.
 
-### 2. v6.0 Production Core Validation ([`benchmarks/v60_validation.py`](benchmarks/v60_validation.py))
-- **Isolated `256 KiB` → `512 KiB` Cliff Re-Verification (`random`, 3 seeds, randomized order, 10 trials):** Confirmed reproducible across all seeds (`256 KiB`: `1874.81–4537.08 MB/s` vs `512 KiB`: `740.79–1240.68 MB/s` vs `1024 KiB`: `771.30–1140.62 MB/s`).
-- **62.16 MiB Incremental Streaming (`process_iter`, `256 KiB` chunks):**
-  - `NullSink`: **`3120.14 MB/s`**, **`0.747 MB` Python heap peak** (`0 B` retained).
-  - `BoundedMemorySink (2 MiB cap)`: **`3188.01 MB/s`**, **`0.993 MB` Python heap peak** (`268,543 B` retained).
-- **`AdaptiveStreamProcessor` vs Fixed Chunk Size (8 MiB, 15 trials):**
-  - `repeated`: `fixed_256k` `10207.99 MB/s`, `fixed_512k` `11936.74 MB/s`, **`adaptive` `11778.56 MB/s`** (automatically selects `512 KiB`).
-  - `random`: `fixed_256k` `5909.29 MB/s`, `fixed_512k` `1946.90 MB/s`, **`adaptive` `5683.43 MB/s`** (automatically selects `256 KiB`).
+### 3. v6.1 Large-Scale Bounded Memory & Heterogeneous Adaptive Validation ([`benchmarks/v61_large_scale.py`](benchmarks/v61_large_scale.py))
+
+#### A. Isolated Subprocess Bounded-Memory Scaling (`64 MiB → 4 GiB`, `BoundedMemorySink` 2 MiB cap)
+Each scale runs in a fresh Python process streaming a pre-allocated `256 KiB` unit via `process_iter` (isolating engine + sink memory from dataset storage):
+
+| Stream Size | Throughput (MB/s) | Time (s) | OS Peak RSS (MB) | PyPeak (MB) | Retained in Sink (B) |
+| :--- | ---: | ---: | ---: | ---: | ---: |
+| `64 MiB` | 2739.46 | 0.023 | **22.52** | 0.777 | 277,760 |
+| `256 MiB` | 2602.41 | 0.098 | **23.61** | 1.602 | 1,111,040 |
+| `1 GiB` | 3834.27 | 0.267 | **24.86** | 2.579 | 2,096,220 |
+| `4 GiB` | 3916.45 | 1.046 | **24.76** | 2.579 | 2,096,220 |
+
+A **64x increase in stream volume** (`64 MiB` → `4 GiB`) keeps OS `Peak RSS` constant at **`22.52–24.86 MB`** and `PyPeak` capped at **`2.579 MB`**.
+
+#### B. Dynamic Adaptive vs Fixed Chunk Sizes on Heterogeneous Entropy Shifts (`16 MiB`, 10 trials, MB/s P50)
+| Dataset | `64K` | `128K` | `256K` | `512K` | `1024K` | `Adaptive (Dyn)` |
+| :--- | ---: | ---: | ---: | ---: | ---: | ---: |
+| `repeated` | 9063.6 | 10078.1 | 9487.4 | 7770.4 | 4383.1 | 7547.5 |
+| `random` | 4092.2 | 5402.0 | 5163.8 | 1360.9 | 1434.2 | **5214.9** |
+| `low_then_high` (`64K` comp → `16M` rand) | 5153.6 | 5487.0 | 5023.6 | 1371.9 | 1436.5 | **4702.3** |
+| `high_then_low` (`64K` rand → `16M` comp) | 9030.1 | 9741.5 | 10663.8 | 11301.8 | 9923.7 | **11221.4** |
+| `alternating` (`1M` comp / `1M` rand) | 6594.7 | 7027.7 | 3992.9 | 2271.4 | 2331.3 | 3890.4 |
+
+#### C. Sink Backpressure (`8 MiB random`)
+- `NullSink`: `1.85 ms` (`4332.29 MB/s`)
+- `BoundedMemorySink (2 MiB)`: `1.80 ms` (`4453.35 MB/s`)
+- `SlowCallbackSink (200 µs/frame)`: `23.50 ms` (`340.41 MB/s`)
 
 ### 2. Isolated Subprocess Full-Lifecycle Peak RSS (`8 MiB random`)
 

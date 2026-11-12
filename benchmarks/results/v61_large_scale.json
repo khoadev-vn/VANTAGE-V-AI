@@ -1,0 +1,299 @@
+{
+  "large_scale_isolated": [
+    {
+      "dataset_mib": 64,
+      "throughput_mbs": 2739.46,
+      "elapsed_s": 0.023,
+      "peak_rss_mb": 22.52,
+      "py_peak_mb": 0.777,
+      "retained_bytes": 277760,
+      "evicted_frames": 0
+    },
+    {
+      "dataset_mib": 256,
+      "throughput_mbs": 2602.41,
+      "elapsed_s": 0.098,
+      "peak_rss_mb": 23.61,
+      "py_peak_mb": 1.602,
+      "retained_bytes": 1111040,
+      "evicted_frames": 0
+    },
+    {
+      "dataset_mib": 1024,
+      "throughput_mbs": 3834.27,
+      "elapsed_s": 0.267,
+      "peak_rss_mb": 24.86,
+      "py_peak_mb": 2.579,
+      "retained_bytes": 2096220,
+      "evicted_frames": 2164
+    },
+    {
+      "dataset_mib": 4096,
+      "throughput_mbs": 3916.45,
+      "elapsed_s": 1.046,
+      "peak_rss_mb": 24.76,
+      "py_peak_mb": 2.579,
+      "retained_bytes": 2096220,
+      "evicted_frames": 14452
+    }
+  ],
+  "heterogeneous_adaptive": [
+    {
+      "dataset": "repeated",
+      "policy": "fixed_64k",
+      "p50_mbs": 9063.62,
+      "p50_ms": 1.765,
+      "p95_ms": 1.875,
+      "p99_ms": 1.922
+    },
+    {
+      "dataset": "repeated",
+      "policy": "fixed_128k",
+      "p50_mbs": 10078.11,
+      "p50_ms": 1.588,
+      "p95_ms": 1.877,
+      "p99_ms": 1.888
+    },
+    {
+      "dataset": "repeated",
+      "policy": "fixed_256k",
+      "p50_mbs": 9487.38,
+      "p50_ms": 1.686,
+      "p95_ms": 1.868,
+      "p99_ms": 1.879
+    },
+    {
+      "dataset": "repeated",
+      "policy": "fixed_512k",
+      "p50_mbs": 7770.39,
+      "p50_ms": 2.059,
+      "p95_ms": 2.463,
+      "p99_ms": 2.476
+    },
+    {
+      "dataset": "repeated",
+      "policy": "fixed_1024k",
+      "p50_mbs": 4383.14,
+      "p50_ms": 3.65,
+      "p95_ms": 5.265,
+      "p99_ms": 5.327
+    },
+    {
+      "dataset": "repeated",
+      "policy": "adaptive_dyn",
+      "p50_mbs": 7547.53,
+      "p50_ms": 2.12,
+      "p95_ms": 2.429,
+      "p99_ms": 2.489
+    },
+    {
+      "dataset": "random",
+      "policy": "fixed_64k",
+      "p50_mbs": 4092.18,
+      "p50_ms": 3.91,
+      "p95_ms": 5.381,
+      "p99_ms": 5.662
+    },
+    {
+      "dataset": "random",
+      "policy": "fixed_128k",
+      "p50_mbs": 5402.03,
+      "p50_ms": 2.962,
+      "p95_ms": 3.061,
+      "p99_ms": 3.075
+    },
+    {
+      "dataset": "random",
+      "policy": "fixed_256k",
+      "p50_mbs": 5163.79,
+      "p50_ms": 3.098,
+      "p95_ms": 3.64,
+      "p99_ms": 3.858
+    },
+    {
+      "dataset": "random",
+      "policy": "fixed_512k",
+      "p50_mbs": 1360.86,
+      "p50_ms": 11.757,
+      "p95_ms": 11.989,
+      "p99_ms": 12.068
+    },
+    {
+      "dataset": "random",
+      "policy": "fixed_1024k",
+      "p50_mbs": 1434.17,
+      "p50_ms": 11.156,
+      "p95_ms": 14.909,
+      "p99_ms": 15.461
+    },
+    {
+      "dataset": "random",
+      "policy": "adaptive_dyn",
+      "p50_mbs": 5214.95,
+      "p50_ms": 3.068,
+      "p95_ms": 3.295,
+      "p99_ms": 3.305
+    },
+    {
+      "dataset": "low_then_high",
+      "policy": "fixed_64k",
+      "p50_mbs": 5153.56,
+      "p50_ms": 3.105,
+      "p95_ms": 3.23,
+      "p99_ms": 3.233
+    },
+    {
+      "dataset": "low_then_high",
+      "policy": "fixed_128k",
+      "p50_mbs": 5486.97,
+      "p50_ms": 2.916,
+      "p95_ms": 3.475,
+      "p99_ms": 3.793
+    },
+    {
+      "dataset": "low_then_high",
+      "policy": "fixed_256k",
+      "p50_mbs": 5023.55,
+      "p50_ms": 3.185,
+      "p95_ms": 4.148,
+      "p99_ms": 4.7
+    },
+    {
+      "dataset": "low_then_high",
+      "policy": "fixed_512k",
+      "p50_mbs": 1371.9,
+      "p50_ms": 11.663,
+      "p95_ms": 12.428,
+      "p99_ms": 12.78
+    },
+    {
+      "dataset": "low_then_high",
+      "policy": "fixed_1024k",
+      "p50_mbs": 1436.45,
+      "p50_ms": 11.139,
+      "p95_ms": 11.536,
+      "p99_ms": 11.606
+    },
+    {
+      "dataset": "low_then_high",
+      "policy": "adaptive_dyn",
+      "p50_mbs": 4702.29,
+      "p50_ms": 3.403,
+      "p95_ms": 3.677,
+      "p99_ms": 3.767
+    },
+    {
+      "dataset": "high_then_low",
+      "policy": "fixed_64k",
+      "p50_mbs": 9030.11,
+      "p50_ms": 1.772,
+      "p95_ms": 1.856,
+      "p99_ms": 1.885
+    },
+    {
+      "dataset": "high_then_low",
+      "policy": "fixed_128k",
+      "p50_mbs": 9741.54,
+      "p50_ms": 1.642,
+      "p95_ms": 1.732,
+      "p99_ms": 1.736
+    },
+    {
+      "dataset": "high_then_low",
+      "policy": "fixed_256k",
+      "p50_mbs": 10663.82,
+      "p50_ms": 1.5,
+      "p95_ms": 1.587,
+      "p99_ms": 1.595
+    },
+    {
+      "dataset": "high_then_low",
+      "policy": "fixed_512k",
+      "p50_mbs": 11301.83,
+      "p50_ms": 1.416,
+      "p95_ms": 1.49,
+      "p99_ms": 1.503
+    },
+    {
+      "dataset": "high_then_low",
+      "policy": "fixed_1024k",
+      "p50_mbs": 9923.71,
+      "p50_ms": 1.612,
+      "p95_ms": 1.824,
+      "p99_ms": 1.924
+    },
+    {
+      "dataset": "high_then_low",
+      "policy": "adaptive_dyn",
+      "p50_mbs": 11221.38,
+      "p50_ms": 1.426,
+      "p95_ms": 1.506,
+      "p99_ms": 1.52
+    },
+    {
+      "dataset": "alternating",
+      "policy": "fixed_64k",
+      "p50_mbs": 6594.67,
+      "p50_ms": 2.426,
+      "p95_ms": 2.478,
+      "p99_ms": 2.488
+    },
+    {
+      "dataset": "alternating",
+      "policy": "fixed_128k",
+      "p50_mbs": 7027.72,
+      "p50_ms": 2.277,
+      "p95_ms": 2.55,
+      "p99_ms": 2.57
+    },
+    {
+      "dataset": "alternating",
+      "policy": "fixed_256k",
+      "p50_mbs": 3992.91,
+      "p50_ms": 4.007,
+      "p95_ms": 4.364,
+      "p99_ms": 4.374
+    },
+    {
+      "dataset": "alternating",
+      "policy": "fixed_512k",
+      "p50_mbs": 2271.39,
+      "p50_ms": 7.044,
+      "p95_ms": 7.682,
+      "p99_ms": 7.733
+    },
+    {
+      "dataset": "alternating",
+      "policy": "fixed_1024k",
+      "p50_mbs": 2331.31,
+      "p50_ms": 6.863,
+      "p95_ms": 7.501,
+      "p99_ms": 7.695
+    },
+    {
+      "dataset": "alternating",
+      "policy": "adaptive_dyn",
+      "p50_mbs": 3890.44,
+      "p50_ms": 4.113,
+      "p95_ms": 4.361,
+      "p99_ms": 4.363
+    }
+  ],
+  "backpressure_sinks": [
+    {
+      "sink": "NullSink",
+      "elapsed_ms": 1.85,
+      "throughput_mbs": 4332.29
+    },
+    {
+      "sink": "BoundedMemorySink_2MiB",
+      "elapsed_ms": 1.8,
+      "throughput_mbs": 4453.35
+    },
+    {
+      "sink": "SlowCallbackSink_200us",
+      "elapsed_ms": 23.5,
+      "throughput_mbs": 340.41
+    }
+  ]
+}

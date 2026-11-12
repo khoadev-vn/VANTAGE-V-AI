@@ -1,7 +1,7 @@
-# Vantage V-AI v6.0 Technical Report: Production Streaming Core & Anomaly Verification
+# Vantage V-AI v6.1 Technical Report: Large-Scale Bounded Streaming & Adaptive Validation
 
 **Author:** Nguyen Vo Anh Khoa  
-**Version:** 6.0.0 (Production Streaming Core)  
+**Version:** 6.1.0 (Bounded-Memory Adaptive Streaming Engine)  
 **Repository:** `khoadev-vn/VANTAGE-V-AI`  
 **Academic Reference:** *MLSysBook Vol. I* (`https://mlsysbook.ai/vol1/`)
 
@@ -55,6 +55,14 @@ Vantage V-AI v5.1 resolves these flaws with a strictly stateless streaming core 
 
 ---
 
-## 6. Next Phase: End-to-End Edge AI Integration
+## 6. v6.1 Large-Scale & Heterogeneous Streaming Validation
+
+1. **O(1) Bounded Memory (`64 MiB → 4 GiB` in Isolated Subprocesses):** Streaming a pre-allocated `256 KiB` chunk via `process_iter` into `BoundedMemorySink(max_bytes=2 MiB)` keeps OS `Peak RSS` at `22.52 MB` (`64 MiB`), `23.61 MB` (`256 MiB`), `24.86 MB` (`1 GiB`), and `24.76 MB` (`4 GiB`, `3916.45 MB/s`, `PyPeak = 2.579 MB`, `Retained = 2,096,220 B`).
+2. **Dynamic Per-Chunk Adaptation (`AdaptiveStreamProcessor`):** Updating chunk size per emitted frame avoids the `512 KiB` collapse on `low_then_high` (`4702.3 MB/s` vs `1371.9 MB/s` for `fixed_512k`) while reaching `11221.4 MB/s` on `high_then_low`.
+3. **Production `FileSink` & Framed Container:** `FileSink(framed=True)` handles partial writes safely, writes `<I` length-prefixed frames, and round-trips via `read_framed_stream()` with `CRC32` verification.
+
+---
+
+## 7. Next Phase: End-to-End Edge AI Integration
 
 Following *MLSysBook Vol. I*, the next milestone is integrating Vantage's bounded-memory streaming layer with a real quantized edge inference runtime (e.g., `llama.cpp` or ONNX Runtime) to evaluate **TTFT**, **end-to-end tokens/s**, and **total Peak RSS** on identical prompts and model weights.
