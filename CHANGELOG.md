@@ -2,6 +2,21 @@
 
 All notable changes to Vantage V-AI are documented in this file.
 
+## [7.3.1] - 2026-11-12 - Scientific Validation Edition
+
+### Added
+- **Pretrained LLM Evaluation (`benchmarks/bench_scientific_validation.py`):**
+  - Evaluated on official Hugging Face pretrained `gpt2` (12 layers, 12 heads, 768 dim, 124M parameters) using a real human text corpus prompt.
+  - 10 independent trials + warmup reporting Median P50, StdDev, and OS Peak RSS.
+  - Active Attention KV memory reduced by **50.1%** (`20.66 MB` vs `41.40 MB`), with OS Peak RSS **195.18 MB lower** (`1001.93 MB` vs `1197.11 MB`).
+  - Throughput P50 increased by **+14.5%** (`8.54 tok/s` vs `7.46 tok/s`) due to bounded sliding-window attention.
+  - Output semantic quality verified: **89.1% token overlap ratio** against uncompressed full-attention baseline.
+- **Scientific Clarifications & Rigorous Metrics:**
+  - Explicit separation of lossless LZ4 (`torch.equal == True`) and lossy FP8 (`bit_for_bit_identical: False`, Average CosSim = `0.99981`, Average MAE = `0.02745`).
+  - Clear distinction between *Active Attention KV Memory* (computation/VRAM tier) and *Total Working Footprint* (Active + Offload tier).
+  - Explicit classification of `VantageStreamingCache` as an offloaded sliding-window attention engine.
+- **Raw Benchmark Artifacts:** Recorded in `artifacts/benchmarks/benchmark_scientific_validation_v7_3_1.json`.
+
 ## [7.3.0] - 2026-11-12
 
 ### Added

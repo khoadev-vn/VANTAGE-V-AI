@@ -1,7 +1,7 @@
-# Vantage V-AI v7.3 Technical Report: Long-Context Scaling, Prompt Checkpoint Parity & Block Offload
+# Vantage V-AI v7.3.1 Technical Report: Pretrained Model Scientific Validation & Dual-Tier KV Architecture
 
 **Author:** Nguyen Vo Anh Khoa  
-**Version:** 7.3.0 (Long-Context & Parity Baseline)  
+**Version:** 7.3.1 (Scientific Validation Edition)  
 **Repository:** `khoadev-vn/VANTAGE-V-AI`  
 **Academic Reference:** *MLSysBook Vol. I* (`https://mlsysbook.ai/vol1/`)
 
@@ -111,6 +111,12 @@ Vantage V-AI v5.1 resolves these flaws with a strictly stateless streaming core 
    - Offloading in blocks of `block_size=32` amortizes compression cost across 32 steps.
    - **Inference Speed Inversion:** On long contexts (2,048 prompt tokens), Vantage achieves **60.91 tok/s** vs **53.69 tok/s** for baseline Hugging Face (**13.4% faster**), because bounding active attention to 2,296 KB completely eliminates quadratic attention degradation ($O(N^2) \to O(N \cdot W)$).
    - **Active KV Memory Savings:** Capped at **2,296 KB** vs **17,400 KB** for baseline (**86.8% active memory reduction**).
+3. **Pretrained GPT-2 Evaluation (`benchmarks/bench_scientific_validation.py`):**
+   - Tested on real Hugging Face `gpt2` (124M params, 12 layers, 12 heads) with a 512-token natural language text corpus prompt.
+   - 10 independent trials: Active KV memory reduced by **50.1%** (`20.66 MB` vs `41.40 MB`), with OS Peak RSS **195.18 MB lower** (`1001.93 MB` vs `1197.11 MB`).
+   - Throughput P50: **8.54 tok/s** vs **7.46 tok/s** (+14.5% speedup).
+   - Output semantics: **89.1% token overlap** against uncompressed full-attention baseline.
+   - Prompt checkpoint on real prefill states: **100% bit-for-bit lossless identical** for LZ4; **3.99x compression** (CosSim: 0.99981, MAE: 0.02745) for dynamic FP8.
 
 ---
 

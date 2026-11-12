@@ -1,4 +1,4 @@
-"""Vantage V-AI core streaming data processing & KV-cache package (v7.3.0)."""
+"""Vantage V-AI core streaming data processing & KV-cache package (v7.3.1)."""
 
 from core.engine import (
     AdaptiveStreamProcessor,
@@ -39,7 +39,7 @@ except ImportError:
     checkpoint_prompt_cache = None
     restore_prompt_cache = None
 
-__version__ = "7.3.0"
+__version__ = "7.3.1"
 
 __all__ = [
     "__version__",

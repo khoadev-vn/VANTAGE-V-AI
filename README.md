@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-30%20Passing%20(Local)-brightgreen.svg)](tests/)
 
-**Vantage V-AI (v7.3.0)** is a **bounded-memory streaming and Attention KV-Cache compression engine** designed for LLM inference runtimes (vLLM, Hugging Face Transformers, llama.cpp, coding agents).
+**Vantage V-AI (v7.3.1)** is a **bounded-memory streaming and Attention KV-Cache compression engine** designed for LLM inference runtimes (vLLM, Hugging Face Transformers, llama.cpp, coding agents).
 
 > **Scientific Positioning:**
 > Vantage V-AI solves memory pressure in AI pipelines across two critical layers:
@@ -226,6 +226,23 @@ Uses discrete chunked offload (`block_size=32`, `window_size=256`) during autore
 - **Speed Advantage on Long Context:** Because active attention is capped at `2,296 KB` instead of scaling to `17,400 KB`, Vantage completely avoids quadratic self-attention degradation, running **13.4% faster** while saving **86.8% active memory**.
 - **Amortized Block Offload:** Compresses only once every 32 generated tokens instead of per-step, dropping compression overhead to near zero.
 - **Raw Benchmark Artifacts:** Recorded in [`artifacts/benchmarks/benchmark_long_context_v7_3.json`](artifacts/benchmarks/benchmark_long_context_v7_3.json).
+
+#### C. Pretrained Hugging Face GPT-2 Multi-Trial Validation (`v7.3.1`, [`benchmarks/bench_scientific_validation.py`](benchmarks/bench_scientific_validation.py))
+
+Evaluated on official pretrained `gpt2` (12 layers, 12 attention heads, 768 hidden dimension, 124M parameters) using a 512-token natural language text prompt across **1 warmup + 10 independent trials**:
+
+| Metric | Standard HF `DynamicCache` | Vantage Streaming (Window=256, Block=32) | Scientific Finding |
+| :--- | ---: | ---: | :--- |
+| **Active Attention KV Memory** | 41,400.0 KB (41.4 MB) | **20,664.0 KB (20.7 MB)** | **50.1% active memory reduction** (VRAM tier) |
+| **Offloaded Compressed Memory** | 0.0 KB | 20,824.6 KB | Offloaded to host memory tier |
+| **Total Process Peak RSS** | 1,197.11 MB | **1,001.93 MB** | **195.18 MB lower Peak RSS** at OS level |
+| **Throughput P50 (Median)** | 7.46 tok/s (Std: 1.42) | **8.54 tok/s (Std: 1.10)** | **+14.5% higher throughput P50** |
+| **Token Overlap Ratio** | 100.0% (Full Attention) | **89.1%** | High semantic coherence under local attention |
+| **Prompt Checkpoint Lossless Parity** | Baseline | **100% BIT-FOR-BIT (`torch.equal == True`)** | Exact zero-drift reconstruction on real weights |
+| **Prompt Checkpoint Dynamic FP8** | Baseline | **3.99x Compression** (CosSim: 0.99981) | MAE = 0.02745 on real prefill states |
+
+- **Transparency on Semantics:** `VantageStreamingCache` maintains an 89.1% token generation overlap with full uncompressed attention while capping active KV memory at 20.66 MB and lowering total OS Peak RSS by 195.18 MB.
+- **Artifacts:** Full raw JSON results stored at [`artifacts/benchmarks/benchmark_scientific_validation_v7_3_1.json`](artifacts/benchmarks/benchmark_scientific_validation_v7_3_1.json).
 
 ---
 

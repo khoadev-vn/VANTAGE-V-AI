@@ -1,0 +1,54 @@
+{
+  "model": {
+    "name": "gpt2",
+    "layers": 12,
+    "heads": 12,
+    "hidden_size": 768,
+    "head_dim": 64,
+    "pretrained": true
+  },
+  "prompt_checkpoint_evaluation": {
+    "prompt_tokens": 512,
+    "raw_kv_kb": 36864.0,
+    "lz4": {
+      "compressed_kb": 37009.3828125,
+      "compression_ratio": 1.0,
+      "checkpoint_ms": 171.88,
+      "restore_ms": 129.89,
+      "bit_for_bit_identical": true
+    },
+    "fp8": {
+      "compressed_kb": 9239.0654296875,
+      "compression_ratio": 3.99,
+      "checkpoint_ms": 234.3,
+      "restore_ms": 147.93,
+      "bit_for_bit_identical": false,
+      "average_cosine_similarity": 0.99981,
+      "average_mae": 0.02745
+    }
+  },
+  "streaming_generation_trials": {
+    "trials": 10,
+    "prompt_tokens": 512,
+    "generated_tokens": 64,
+    "window_size": 256,
+    "block_size": 32,
+    "standard_hf": {
+      "active_kv_kb": 41400.0,
+      "offloaded_kb": 0.0,
+      "throughput_p50": 7.46,
+      "throughput_std": 1.42,
+      "peak_rss_mb": 1197.11
+    },
+    "vantage_streaming": {
+      "active_kv_kb": 20664.0,
+      "offloaded_kb": 20824.59375,
+      "total_kv_kb": 41488.59375,
+      "active_reduction_pct": 50.1,
+      "throughput_p50": 8.54,
+      "throughput_std": 1.1,
+      "peak_rss_mb": 1001.93,
+      "token_overlap_ratio": 0.8906
+    }
+  }
+}
