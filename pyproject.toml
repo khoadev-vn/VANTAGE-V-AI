@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "vantage-vai"
-version = "7.3.2"
-description = "A bounded-memory streaming & KV-Cache compression engine designed for predictable resource usage in AI systems."
+version = "8.0.0"
+description = "SOTA bounded-memory streaming engine, 1.58-bit ternary KV-cache, and hyperdimensional associative memory for frontier LLM & edge AI systems."
 readme = "README.md"
 license = { file = "LICENSE" }
 requires-python = ">=3.10"

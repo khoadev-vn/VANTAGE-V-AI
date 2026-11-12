@@ -118,3 +118,59 @@ def test_vantage_prompt_checkpoint_fp8_compression():
         # Cosine similarity should be > 0.999
         cossim = torch.nn.functional.cosine_similarity(orig_k.flatten(), rest_k.flatten(), dim=0)
         assert cossim.item() > 0.999
+
+
+def test_vantage_streaming_cache_attention_sinks():
+    """Verify that initial sink tokens are strictly preserved during streaming offload."""
+    sink_tokens = 4
+    max_active = 16
+    block_size = 8
+
+    cache = VantageStreamingCache(
+        max_active_tokens=max_active,
+        block_size=block_size,
+        sink_tokens=sink_tokens,
+        quantize_fp8=False,
+    )
+
+    # Track initial tokens
+    all_k = []
+    all_v = []
+    for step in range(32):
+        k = torch.full((1, 2, 1, 32), fill_value=float(step), dtype=torch.float32)
+        v = torch.full((1, 2, 1, 32), fill_value=float(step), dtype=torch.float32)
+        all_k.append(k)
+        all_v.append(v)
+        cache.update(k, v, layer_idx=0)
+
+    # Check active keys: the first sink_tokens tokens must match steps 0, 1, 2, 3!
+    active_k, _ = cache._get_layer_keys_values(0)
+    # Total active tokens should be <= max_active + block_size
+    assert active_k.shape[-2] <= max_active + block_size
+
+    # Verify first 4 tokens in active cache are the sink tokens (0, 1, 2, 3)
+    for i in range(sink_tokens):
+        assert torch.all(active_k[..., i, :] == float(i)), f"Sink token {i} was corrupted or evicted!"
+
+
+def test_vantage_prompt_checkpoint_ternary_158():
+    from core.kv import QUANT_TERNARY_158
+
+    prompt_len = 256
+    cache = DynamicCache()
+    for l in range(2):
+        k = torch.randn(1, 4, prompt_len, 64, dtype=torch.float32)
+        v = torch.randn(1, 4, prompt_len, 64, dtype=torch.float32)
+        cache.update(k, v, layer_idx=l)
+
+    checkpoint = checkpoint_prompt_cache(cache, quant_mode=QUANT_TERNARY_158)
+    restored = restore_prompt_cache(checkpoint)
+
+    for l in range(2):
+        orig_k = cache.layers[l].keys if hasattr(cache, "layers") else cache.key_cache[l]
+        rest_k = restored.layers[l].keys if hasattr(restored, "layers") else restored.key_cache[l]
+
+        assert orig_k.shape == rest_k.shape
+        cossim = torch.nn.functional.cosine_similarity(orig_k.flatten(), rest_k.flatten(), dim=0)
+        assert cossim.item() > 0.70
+

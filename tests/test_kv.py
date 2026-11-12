@@ -99,3 +99,55 @@ def test_torch_kv_cache_fp8_quantized_stream_offload():
     assert err.root_mean_squared_error < 0.03
     assert err.relative_error < 0.03
     assert err.cosine_similarity > 0.999
+
+
+def test_ternary_158_pack_unpack_roundtrip():
+    from core.kv import pack_ternary_2bit, unpack_ternary_2bit
+
+    # Create synthetic ternary array with exact {-1, 0, +1} values
+    rng = np.random.default_rng(42)
+    original = rng.choice([-1.0, 0.0, 1.0], size=(64, 8, 128)).astype(np.float32)
+
+    packed = pack_ternary_2bit(original)
+
+    # 64 * 8 * 128 = 65,536 elements -> 65536 / 4 = 16,384 bytes
+    assert len(packed) == original.size // 4
+    # FP32 raw bytes: 65,536 * 4 = 262,144 bytes -> 16x reduction!
+    assert (original.size * 4) / len(packed) == 16.0
+
+    restored = unpack_ternary_2bit(packed, target_size=original.size, scale=1.0)
+    restored = restored.reshape(original.shape).astype(np.float32)
+
+    np.testing.assert_array_equal(original, restored)
+
+
+@pytest.mark.skipif(torch is None, reason="PyTorch is not available")
+def test_torch_kv_cache_ternary_158_stream_offload():
+    from core.kv import QUANT_TERNARY_158
+
+    engine = KVCacheStreamEngine(codec=CodecType.LZ4_BLOCK)
+
+    # Simulate FP16 Attention tensors
+    k = torch.randn(512, 8, 128, dtype=torch.float16)
+    v = torch.randn(512, 8, 128, dtype=torch.float16)
+    kv_cache = {0: (k, v)}
+
+    stream = io.BytesIO()
+    total_bytes = engine.stream_offload_cache(kv_cache, stream, quant_mode=QUANT_TERNARY_158)
+    raw_bytes = k.numel() * k.element_size() + v.numel() * v.element_size()
+
+    # Ternary packed (2-bit per element) achieves > 7.5x compression on raw FP16
+    compression_ratio = raw_bytes / total_bytes
+    assert compression_ratio >= 7.0
+
+    stream.seek(0)
+    reloaded = engine.stream_reload_cache(stream, as_torch=True)
+    k_rel, v_rel = reloaded[0]
+
+    assert k_rel.shape == k.shape
+    assert v_rel.shape == v.shape
+
+    # Cosine similarity between ternary quant and continuous weights is positive and aligned
+    cos_sim_k = torch.nn.functional.cosine_similarity(k.flatten().float(), k_rel.flatten().float(), dim=0)
+    assert cos_sim_k.item() > 0.70  # Standard expected alignment for 1.58-bit ternary quantization
+
