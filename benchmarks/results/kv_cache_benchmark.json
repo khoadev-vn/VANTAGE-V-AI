@@ -1,0 +1,28 @@
+{
+  "llama3_4k": {
+    "tokens": 4096,
+    "layers": 8,
+    "raw_mb": 128.0,
+    "fp8_compressed_mb": 64.25,
+    "fp8_compression_ratio": 1.99,
+    "fp8_offload_ms": 1161.76,
+    "fp8_min_cosine_similarity": 1.00028,
+    "lossless_offload_ms": 758.66,
+    "lossless_reload_ms": 363.61,
+    "torch_save_ms": 159.57,
+    "bit_for_bit_lossless": true
+  },
+  "llama3_8k": {
+    "tokens": 8192,
+    "layers": 8,
+    "raw_mb": 256.0,
+    "fp8_compressed_mb": 128.5,
+    "fp8_compression_ratio": 1.99,
+    "fp8_offload_ms": 2154.19,
+    "fp8_min_cosine_similarity": 1.00048,
+    "lossless_offload_ms": 1600.24,
+    "lossless_reload_ms": 984.41,
+    "torch_save_ms": 422.92,
+    "bit_for_bit_lossless": true
+  }
+}

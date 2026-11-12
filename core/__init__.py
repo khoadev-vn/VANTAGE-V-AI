@@ -17,8 +17,13 @@ from core.engine import (
     iter_record_chunks,
     read_framed_stream,
 )
+from core.kv import (
+    KVCacheMetadata,
+    KVCacheStreamEngine,
+    KVStreamStats,
+)
 
-__version__ = "6.4.1"
+__version__ = "7.0.0"
 
 __all__ = [
     "__version__",
@@ -28,6 +33,9 @@ __all__ = [
     "CodecType",
     "CollectingSink",
     "FileSink",
+    "KVCacheMetadata",
+    "KVCacheStreamEngine",
+    "KVStreamStats",
     "NullSink",
     "OutputSink",
     "ParallelStreamProcessor",
