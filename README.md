@@ -5,6 +5,7 @@
 [![Tests](https://img.shields.io/badge/Tests-45%20Passing%20(Local)-brightgreen.svg)](tests/)
 [![Version](https://img.shields.io/badge/Version-8.2.0-purple.svg)](pyproject.toml)
 [![Paper](https://img.shields.io/badge/Technical%20Report-v8.2.0%20(PDF)-blue.svg)](paper/VANTAGE_Paper_v8.2.pdf)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24243287.svg)](https://doi.org/10.5281/zenodo.24243287)
 [![Kaggle GPU](https://img.shields.io/badge/Kaggle%20GPU-2x%20Tesla%20T4-orange.svg)](benchmarks/kaggle_gpu_benchmark.py)
 [![Author](https://img.shields.io/badge/Author-Nguyen%20Vo%20Anh%20Khoa-red.svg)](https://github.com/khoadev-vn)
 
