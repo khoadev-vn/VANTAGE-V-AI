@@ -1,7 +1,7 @@
 # Vantage V-AI: Bounded-Memory Streaming Engine, 2-Bit Packed Ternary KV-Cache & HDC Associative Memory
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License: MIT](https://img.shields.io/badge/License-AGPL_v3-yellow.svg)](LICENSE)
 [![Tests](https://img.shields.io/badge/Tests-45%20Passing%20(Local)-brightgreen.svg)](tests/)
 [![Version](https://img.shields.io/badge/Version-8.2.0-purple.svg)](pyproject.toml)
 [![Paper](https://img.shields.io/badge/Technical%20Report-v8.2.0%20(PDF)-blue.svg)](paper/VANTAGE_Paper_v8.2.pdf)
@@ -128,9 +128,15 @@ Evaluated across varying context lengths ($N \in \{512, 1024, 2048, 4096\}$) to 
 
 ---
 
-## 📄 License & Compliance
+## 📄 License & Commercial Terms
 
-This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
-```text
+VANTAGE-V-AI is dual-licensed:
+
+- **Open Source / Academic Research:** Licensed under the [GNU Affero General Public License v3.0 (AGPLv3)](LICENSE). Any modification, network execution (SaaS), or commercial embedding requires open-sourcing the entire derivative codebase under AGPLv3.
+- **Commercial & Enterprise Licensing:** For companies integrating VANTAGE-V-AI into closed-source commercial software, robotics, edge hardware, smart cameras, or proprietary enterprise systems, a separate **Commercial License** is required.
+
+📧 **Commercial & Enterprise Inquiries:** [kanh05113@gmail.com](mailto:kanh05113@gmail.com)
+
+`	ext
 Copyright (c) 2026 Nguyen Vo Anh Khoa. All rights reserved.
-```
+`
