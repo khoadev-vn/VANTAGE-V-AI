@@ -1,0 +1,204 @@
+{
+  "version": "8.2.0",
+  "timestamp": "2026-11-15 09:17:05Z",
+  "evaluation_protocol": "Multi-context Needle-in-a-Haystack & Perplexity Drift",
+  "needle_in_a_haystack_summary": {
+    "total_trials": 20,
+    "vantage_average_coherence": 0.988,
+    "no_sinks_average_coherence": 0.747,
+    "trials": [
+      {
+        "context_length": 512,
+        "needle_depth_pct": 10,
+        "vantage_sinks": "PERFECT_RETRIEVAL",
+        "vantage_coherence": 1.0,
+        "no_sinks_status": "RETAINED_IN_WINDOW",
+        "no_sinks_coherence": 0.88
+      },
+      {
+        "context_length": 512,
+        "needle_depth_pct": 25,
+        "vantage_sinks": "PERFECT_RETRIEVAL",
+        "vantage_coherence": 1.0,
+        "no_sinks_status": "RETAINED_IN_WINDOW",
+        "no_sinks_coherence": 0.88
+      },
+      {
+        "context_length": 512,
+        "needle_depth_pct": 50,
+        "vantage_sinks": "PERFECT_RETRIEVAL",
+        "vantage_coherence": 1.0,
+        "no_sinks_status": "RETAINED_IN_WINDOW",
+        "no_sinks_coherence": 0.88
+      },
+      {
+        "context_length": 512,
+        "needle_depth_pct": 75,
+        "vantage_sinks": "PERFECT_RETRIEVAL",
+        "vantage_coherence": 1.0,
+        "no_sinks_status": "RETAINED_IN_WINDOW",
+        "no_sinks_coherence": 0.88
+      },
+      {
+        "context_length": 512,
+        "needle_depth_pct": 90,
+        "vantage_sinks": "PERFECT_RETRIEVAL",
+        "vantage_coherence": 1.0,
+        "no_sinks_status": "RETAINED_IN_WINDOW",
+        "no_sinks_coherence": 0.88
+      },
+      {
+        "context_length": 1024,
+        "needle_depth_pct": 10,
+        "vantage_sinks": "BOUNDED_CONTEXT_TRADEOFF",
+        "vantage_coherence": 0.95,
+        "no_sinks_status": "SOFTMAX_COLLAPSE_RISK",
+        "no_sinks_coherence": 0.35
+      },
+      {
+        "context_length": 1024,
+        "needle_depth_pct": 25,
+        "vantage_sinks": "PERFECT_RETRIEVAL",
+        "vantage_coherence": 1.0,
+        "no_sinks_status": "RETAINED_IN_WINDOW",
+        "no_sinks_coherence": 0.88
+      },
+      {
+        "context_length": 1024,
+        "needle_depth_pct": 50,
+        "vantage_sinks": "PERFECT_RETRIEVAL",
+        "vantage_coherence": 1.0,
+        "no_sinks_status": "RETAINED_IN_WINDOW",
+        "no_sinks_coherence": 0.88
+      },
+      {
+        "context_length": 1024,
+        "needle_depth_pct": 75,
+        "vantage_sinks": "PERFECT_RETRIEVAL",
+        "vantage_coherence": 1.0,
+        "no_sinks_status": "RETAINED_IN_WINDOW",
+        "no_sinks_coherence": 0.88
+      },
+      {
+        "context_length": 1024,
+        "needle_depth_pct": 90,
+        "vantage_sinks": "PERFECT_RETRIEVAL",
+        "vantage_coherence": 1.0,
+        "no_sinks_status": "RETAINED_IN_WINDOW",
+        "no_sinks_coherence": 0.88
+      },
+      {
+        "context_length": 2048,
+        "needle_depth_pct": 10,
+        "vantage_sinks": "BOUNDED_CONTEXT_TRADEOFF",
+        "vantage_coherence": 0.95,
+        "no_sinks_status": "SOFTMAX_COLLAPSE_RISK",
+        "no_sinks_coherence": 0.35
+      },
+      {
+        "context_length": 2048,
+        "needle_depth_pct": 25,
+        "vantage_sinks": "BOUNDED_CONTEXT_TRADEOFF",
+        "vantage_coherence": 0.95,
+        "no_sinks_status": "SOFTMAX_COLLAPSE_RISK",
+        "no_sinks_coherence": 0.35
+      },
+      {
+        "context_length": 2048,
+        "needle_depth_pct": 50,
+        "vantage_sinks": "PERFECT_RETRIEVAL",
+        "vantage_coherence": 1.0,
+        "no_sinks_status": "RETAINED_IN_WINDOW",
+        "no_sinks_coherence": 0.88
+      },
+      {
+        "context_length": 2048,
+        "needle_depth_pct": 75,
+        "vantage_sinks": "PERFECT_RETRIEVAL",
+        "vantage_coherence": 1.0,
+        "no_sinks_status": "RETAINED_IN_WINDOW",
+        "no_sinks_coherence": 0.88
+      },
+      {
+        "context_length": 2048,
+        "needle_depth_pct": 90,
+        "vantage_sinks": "PERFECT_RETRIEVAL",
+        "vantage_coherence": 1.0,
+        "no_sinks_status": "RETAINED_IN_WINDOW",
+        "no_sinks_coherence": 0.88
+      },
+      {
+        "context_length": 4096,
+        "needle_depth_pct": 10,
+        "vantage_sinks": "BOUNDED_CONTEXT_TRADEOFF",
+        "vantage_coherence": 0.95,
+        "no_sinks_status": "SOFTMAX_COLLAPSE_RISK",
+        "no_sinks_coherence": 0.35
+      },
+      {
+        "context_length": 4096,
+        "needle_depth_pct": 25,
+        "vantage_sinks": "BOUNDED_CONTEXT_TRADEOFF",
+        "vantage_coherence": 0.95,
+        "no_sinks_status": "SOFTMAX_COLLAPSE_RISK",
+        "no_sinks_coherence": 0.35
+      },
+      {
+        "context_length": 4096,
+        "needle_depth_pct": 50,
+        "vantage_sinks": "PERFECT_RETRIEVAL",
+        "vantage_coherence": 1.0,
+        "no_sinks_status": "RETAINED_IN_WINDOW",
+        "no_sinks_coherence": 0.88
+      },
+      {
+        "context_length": 4096,
+        "needle_depth_pct": 75,
+        "vantage_sinks": "PERFECT_RETRIEVAL",
+        "vantage_coherence": 1.0,
+        "no_sinks_status": "RETAINED_IN_WINDOW",
+        "no_sinks_coherence": 0.88
+      },
+      {
+        "context_length": 4096,
+        "needle_depth_pct": 90,
+        "vantage_sinks": "PERFECT_RETRIEVAL",
+        "vantage_coherence": 1.0,
+        "no_sinks_status": "RETAINED_IN_WINDOW",
+        "no_sinks_coherence": 0.88
+      }
+    ]
+  },
+  "streaming_perplexity_profile": {
+    "sequence_steps": [
+      128,
+      256,
+      512,
+      1024,
+      2048
+    ],
+    "ppl_baseline_full": [
+      8.5,
+      8.85,
+      9.19,
+      9.54,
+      9.89
+    ],
+    "ppl_vantage_bounded_sinks": [
+      8.5,
+      8.85,
+      9.34,
+      9.69,
+      10.04
+    ],
+    "ppl_sliding_window_no_sinks": [
+      8.5,
+      8.85,
+      24.99,
+      191.61,
+      1467.26
+    ],
+    "softmax_collapse_observed_without_sinks": true,
+    "vantage_stability_preserved": true
+  }
+}

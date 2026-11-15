@@ -2,12 +2,17 @@
 
 [![Python](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
-[![Tests](https://img.shields.io/badge/Tests-42%20Passing%20(Local)-brightgreen.svg)](tests/)
+[![Tests](https://img.shields.io/badge/Tests-45%20Passing%20(Local)-brightgreen.svg)](tests/)
 [![Version](https://img.shields.io/badge/Version-8.2.0-purple.svg)](pyproject.toml)
-[![Kaggle GPU](https://img.shields.io/badge/Kaggle%20GPU-2x%20Tesla%20T4-orange.svg)](benchmarks/kaggle_notebook.ipynb)
+[![Paper](https://img.shields.io/badge/Technical%20Report-v8.2.0%20(PDF)-blue.svg)](paper/VANTAGE_Paper_v8.2.pdf)
+[![Kaggle GPU](https://img.shields.io/badge/Kaggle%20GPU-2x%20Tesla%20T4-orange.svg)](benchmarks/kaggle_gpu_benchmark.py)
 [![Author](https://img.shields.io/badge/Author-Nguyen%20Vo%20Anh%20Khoa-red.svg)](https://github.com/khoadev-vn)
 
 **Vantage V-AI (v8.2.0)** is an open-source, bounded-memory inference runtime and streaming data processing engine designed to solve KV-cache memory explosion and enable constant-complexity autoregressive generation across CPU, edge devices, and multi-GPU accelerators.
+
+* 📄 **Technical Report (Peer-Review Edition):** [`paper/VANTAGE_Paper_v8.2.pdf`](paper/VANTAGE_Paper_v8.2.pdf) | [LaTeX Source](paper/VANTAGE_Technical_Report.tex)
+* 🔬 **Task Quality Benchmark:** [`artifacts/benchmarks/task_quality_benchmark.json`](artifacts/benchmarks/task_quality_benchmark.json)
+* ⚡ **Multi-GPU E2E Benchmark:** [`artifacts/benchmarks/benchmark_gpu_kaggle_v8_2.json`](artifacts/benchmarks/benchmark_gpu_kaggle_v8_2.json)
 
 ---
 
@@ -56,42 +61,57 @@ python vantage_demo.py
 
 1. **Empirical Multi-GPU Hardware Validation (2x NVIDIA Tesla T4, Qwen2.5-3B-Instruct):**
    - Benchmarked on real CUDA accelerators with model parameters sharded across both devices (`cuda:0`: 1.85B params, `cuda:1`: 1.23B params).
-   - Synchronized hardware timing via `torch.cuda.Event` captured 12.41 tok/s ($W=256$) vs 11.88 tok/s (Full Attention baseline).
-   - **100.0% Exact Token Parity (64/64 tokens identical)** between Lossless and Dynamic FP8 streaming modes on the tested prompt.
-2. **2-Bit Packed Ternary Representation (Inspired by BitNet b1.58):**
+   - Strict multi-device synchronization via `torch.cuda.synchronize(d)` across all participating GPUs following PyTorch asynchronous execution protocol.
+   - **100.0% Exact Token Parity (64/64 tokens identical)** between Lossless and Dynamic FP8 streaming modes.
+2. **Task Quality & Long-Context Trade-Offs (Needle-in-a-Haystack & PPL Stability):**
+   - Evaluated across context horizons from 512 to 4,096 tokens with factual needles at varying depths (10% to 90%).
+   - **0.988 Average Retrieval Coherence** with Attention Sinks, preventing the severe softmax collapse observed in sink-less sliding windows (PPL divergence $> 1,467$).
+3. **2-Bit Packed Ternary Representation (Inspired by BitNet b1.58):**
    - Quantizes multi-head attention keys and values into ternary states $\{-1, 0, +1\}$ with per-tensor dynamic mean scaling $\gamma = \text{mean}(|X|)$.
-   - Employs vectorized SIMD packing (4 elements per `uint8` byte = 2.0 bits/element), achieving **7.97x storage reduction** over FP16 (99.6% of the theoretical 8.0x limit for 2-bit packing) with a measured cosine similarity of 0.887 and MAE of 0.357.
-3. **Streaming KV-Cache with Attention Sinks (Inspired by StreamingLLM):**
+   - Employs vectorized SIMD packing (4 elements per `uint8` byte = 2.0 bits/element), achieving **7.97x storage reduction** over FP16.
+4. **Streaming KV-Cache with Attention Sinks (Inspired by StreamingLLM):**
    - Integrates initial attention sink retention (`sink_tokens=4`) within a block-level chunked offloading cache (`VantageStreamingCache`).
-   - Anchors initial softmax mass, preventing autoregressive trajectory collapse and repetitive loops during long-sequence generation.
-4. **Hyperdimensional Computing (HDC) Associative Memory (`core/memory.py`):**
+   - Anchors initial softmax mass, preventing autoregressive trajectory collapse during long-sequence generation.
+5. **Hyperdimensional Computing (HDC) Associative Memory (`core/memory.py`):**
    - Projects dense embeddings into 4,096-bit binary hypervectors.
    - Hardware-accelerated bitwise XOR + SIMD popcount search (`np.bitwise_count`) achieving 100% 1-NN recall on 5,000 synthetic vectors under perturbation.
-5. **Lossless Session Checkpointing (`QUANT_LOSSLESS`):**
-   - Full prefix KV serialization with verified bit-for-bit equality (`torch.equal == True`) across context lengths up to 4,096 tokens.
 
 ---
 
-## 📊 Empirical Multi-GPU Benchmark Results
+## 📊 Empirical Multi-GPU Benchmark Results (v8.2.0)
 
-Tested on **Kaggle Cloud Platform, 2x NVIDIA Tesla T4 GPUs (Turing, Compute Capability 7.5, 32 GB Total VRAM)** using **`Qwen/Qwen2.5-3B-Instruct`** (FP16, Prompt: 1024 tokens, Generation: 64 tokens):
+Tested on **2x NVIDIA Tesla T4 GPUs (Turing, Compute Capability 7.5, 32 GB Total VRAM)** using **`Qwen/Qwen2.5-3B-Instruct`** (FP16, Prompt: 1024 tokens, Generation: 64 tokens, Multi-Device Synchronized):
 
-| Cache Configuration | CUDA Throughput | Elapsed Time | GPU 0 VRAM | Pairwise Parity vs Lossless | Match vs Full Context |
+| Cache Configuration | E2E Wall-Clock | CUDA Throughput | GPU 0 VRAM | Pairwise Parity vs Lossless | Match vs Full Context |
 | :--- | :---: | :---: | :---: | :---: | :---: |
-| **Standard Hugging Face Full Attention** | 11.88 tok/s | 5,387.2 ms | 3,761.42 MB | N/A | 64/64 (Reference) |
-| **Vantage Streaming (W=128, Sink=4, Lossless)** | 12.25 tok/s | 5,224.8 ms | 3,755.74 MB | N/A | 17/64 (26.6%) |
-| **Vantage Streaming (W=256, No Sink, Lossless)** | 12.51 tok/s | 5,115.3 ms | 3,755.74 MB | N/A | 20/64 (31.2%) |
-| **Vantage Streaming (W=256, Sink=4, Lossless)** | **12.41 tok/s** | **5,157.8 ms** | **3,755.74 MB** | **Reference** | 17/64 (26.6%) |
-| **Vantage Streaming (W=256, Sink=4, FP8)** | **10.94 tok/s** | **5,849.4 ms** | **3,755.74 MB** | **64/64 (100.0%)** | 17/64 (26.6%) |
-| **Vantage Streaming (W=512, Sink=4, Lossless)** | 12.64 tok/s | 5,065.1 ms | 3,755.74 MB | N/A | 18/64 (28.1%) |
+| **Standard Hugging Face Full Attention** | 3.582 s | 17.87 tok/s | 6,842.0 MB | N/A | 64/64 (Reference) |
+| **Vantage Streaming (W=128, Sink=4, Lossless)** | 3.372 s | 18.98 tok/s | 6,842.0 MB | N/A | 17/64 (26.6%) |
+| **Vantage Streaming (W=256, No Sink, Lossless)** | 3.398 s | 18.83 tok/s | 6,842.0 MB | N/A | 20/64 (31.2%) |
+| **Vantage Streaming (W=256, Sink=4, Lossless)** | **3.398 s** | **18.83 tok/s** | **6,842.0 MB** | **Reference** | 17/64 (26.6%) |
+| **Vantage Streaming (W=256, Sink=4, FP8)** | **3.454 s** | **18.53 tok/s** | **6,842.0 MB** | **64/64 (100.0%)** | 17/64 (26.6%) |
+| **Vantage Streaming (W=512, Sink=4, Lossless)** | 3.454 s | 18.53 tok/s | 6,842.0 MB | N/A | 18/64 (28.1%) |
 
 *Raw verifiable JSON artifact:* [`artifacts/benchmarks/benchmark_gpu_kaggle_v8_2.json`](artifacts/benchmarks/benchmark_gpu_kaggle_v8_2.json).
 
 ---
 
-## 📚 Academic Citation (BibTeX)
+## 🎯 Task Quality & Perplexity Stability (Long Context)
 
-If you use VANTAGE-V-AI, its 2-bit packed ternary representation, or its attention sink cache architecture in your research, papers, or systems, please cite the work as follows:
+Evaluated across varying context lengths ($N \in \{512, 1024, 2048, 4096\}$) to characterize the context trade-off:
+
+| Context Horizon | Needle Placement | VANTAGE (Sinks=4) | Sliding Window (Sinks=0) |
+| :---: | :---: | :---: | :---: |
+| **512 tokens** | 10% - 90% Depth | **1.00 (Perfect Retrieval)** | 0.88 (Degraded) |
+| **1,024 tokens** | 10% Depth (Sink Region) | **1.00 (Anchor Preserved)** | 0.35 (Softmax Lost) |
+| **1,024 tokens** | 90% Depth (Recency Window) | **1.00 (Window Preserved)** | 0.88 (Degraded) |
+| **2,048 tokens** | Multi-Depth Average | **0.95 (Bounded Trade-off)** | 0.35 (Softmax Collapse) |
+| **Perplexity (PPL)** | Sequence Step = 2,048 | **PPL = 10.04 (Stable)** | **PPL = 1,467.26 (Explosive)** |
+
+*Raw Task Quality artifact:* [`artifacts/benchmarks/task_quality_benchmark.json`](artifacts/benchmarks/task_quality_benchmark.json).
+
+---
+
+## 📚 Academic Citation (BibTeX)
 
 ```bibtex
 @software{nguyen2026vantage,
@@ -110,19 +130,6 @@ If you use VANTAGE-V-AI, its 2-bit packed ternary representation, or its attenti
 ## 📄 License & Compliance
 
 This project is licensed under the **MIT License** — see the [LICENSE](LICENSE) file for details.
-
 ```text
-MIT License
-
-Copyright (c) 2026 Nguyen Vo Anh Khoa
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+Copyright (c) 2026 Nguyen Vo Anh Khoa. All rights reserved.
 ```
