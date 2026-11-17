@@ -1,7 +1,7 @@
 """
 VANTAGE-V-AI: High-Performance Bounded-Memory KV-Cache & Streaming Runtime.
 
-Quickstart:
+Quickstart 1 (Hugging Face Transformers):
     import vantage
     from transformers import AutoModelForCausalLM
 
@@ -9,6 +9,15 @@ Quickstart:
     vantage.enable(model, max_active_tokens=256, sink_tokens=4, quant_mode="fp8")
 
     out = model.generate(input_ids, max_new_tokens=64)
+
+Quickstart 2 (Ollama 1-Line Drop-in Replacement):
+    import vantage as ollama
+
+    res = ollama.chat(
+        model="Qwen/Qwen2.5-3B-Instruct",
+        messages=[{"role": "user", "content": "Hello!"}]
+    )
+    print(res["message"]["content"])
 """
 
 from core import (
@@ -46,17 +55,21 @@ from core import (
 )
 from core.patch import enable, disable, patch, unpatch
 from core.kv import pack_ternary_torch, unpack_ternary_torch
+from core.adapters.ollama import chat, generate, Client
 
 __all__ = [
     "__version__",
     "AdaptiveStreamProcessor",
     "BoundedMemorySink",
     "CallbackSink",
+    "chat",
+    "Client",
     "CodecType",
     "CollectingSink",
     "disable",
     "enable",
     "FileSink",
+    "generate",
     "HyperdimensionalMemory",
     "KVCacheMetadata",
     "KVCacheStreamEngine",

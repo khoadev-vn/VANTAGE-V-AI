@@ -60,6 +60,23 @@ Run the visual streaming monitor demo in your terminal:
 python vantage_demo.py
 ```
 
+### 🦙 Ollama 1-Line Drop-in Replacement (Zero-Code Rewrite)
+
+Drop-in replacement for the official `ollama` Python package. Simply replace `import ollama` with `import vantage as ollama`—all existing calls (`ollama.chat()`, `ollama.generate()`, and `ollama.Client()`) execute with **90%+ KV-cache memory reduction**:
+
+```python
+# Replace: import ollama
+import vantage as ollama
+
+# Existing Ollama application code runs 100% unchanged with bounded memory!
+response = ollama.chat(
+    model="Qwen/Qwen2.5-3B-Instruct",  # Supports "llama3:8b", "mistral:7b", or HF IDs
+    messages=[{"role": "user", "content": "Explain how edge AI devices avoid memory overflow."}],
+)
+
+print(response["message"]["content"])
+```
+
 ---
 
 ## 🔬 Core Architectural Foundations (v8.2.0)
