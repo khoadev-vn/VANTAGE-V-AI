@@ -29,6 +29,7 @@ from core.kv import (
     unpack_ternary_2bit,
 )
 from core.memory import HyperdimensionalMemory
+from core.tla import TernaryLatentAttentionEngine, TLACompressionStats
 
 try:
     from core.adapters.transformers import (
@@ -45,7 +46,7 @@ except ImportError:
     checkpoint_prompt_cache = None
     restore_prompt_cache = None
 
-__version__ = "8.2.0"
+__version__ = "8.3.0"
 
 __all__ = [
     "__version__",
@@ -56,6 +57,8 @@ __all__ = [
     "CollectingSink",
     "FileSink",
     "HyperdimensionalMemory",
+    "TLACompressionStats",
+    "TernaryLatentAttentionEngine",
     "KVCacheMetadata",
     "KVCacheStreamEngine",
     "KVQuantizationError",

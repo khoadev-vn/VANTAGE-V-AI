@@ -1,0 +1,55 @@
+{
+  "8b_model": {
+    "single_layer_4k": {
+      "num_tokens": 4096,
+      "num_heads": 8,
+      "head_dim": 128,
+      "latent_dim": 512,
+      "rope_dim": 64,
+      "standard_fp16_bytes": 16777216,
+      "deepseek_mla_fp16_bytes": 4718592,
+      "vantage_tla_bytes": 1048576,
+      "ratio_vs_standard": 16.0,
+      "ratio_vs_deepseek_mla": 4.5,
+      "percent_savings_vs_standard": 93.75,
+      "percent_savings_vs_deepseek_mla": 77.78,
+      "reconstruction_cosine_sim": 0.4422,
+      "reconstruction_mae": 0.7204,
+      "compression_time_ms": 144.666,
+      "decompression_time_ms": 57.158
+    },
+    "full_model_32k_mb": {
+      "standard_fp16": 4096.0,
+      "deepseek_mla_fp16": 1152.0,
+      "vantage_tla_2bit": 256.0,
+      "tla_compression_ratio": 16.0
+    }
+  },
+  "70b_model": {
+    "single_layer_4k": {
+      "num_tokens": 4096,
+      "num_heads": 64,
+      "head_dim": 128,
+      "latent_dim": 512,
+      "rope_dim": 64,
+      "standard_fp16_bytes": 134217728,
+      "deepseek_mla_fp16_bytes": 4718592,
+      "vantage_tla_bytes": 1048576,
+      "ratio_vs_standard": 128.0,
+      "ratio_vs_deepseek_mla": 4.5,
+      "percent_savings_vs_standard": 99.22,
+      "percent_savings_vs_deepseek_mla": 77.78,
+      "reconstruction_cosine_sim": 0.1564,
+      "reconstruction_mae": 0.7883,
+      "compression_time_ms": 405.081,
+      "decompression_time_ms": 354.739
+    },
+    "full_model_32k_mb": {
+      "standard_fp16": 65536.0,
+      "deepseek_mla_fp16": 2304.0,
+      "vantage_tla_2bit": 512.0,
+      "tla_compression_ratio": 128.0,
+      "tla_vs_deepseek_mla_ratio": 4.5
+    }
+  }
+}
