@@ -2,3 +2,9 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
+
+# Proprietary Enterprise Trade Secrets & Closed-Source Binaries (NEVER PUSH)
+enterprise/
+*.lic
+*.key
+build_private/
